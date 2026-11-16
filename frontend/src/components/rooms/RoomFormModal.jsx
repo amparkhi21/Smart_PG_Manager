@@ -1,0 +1,125 @@
+import { useState } from 'react';
+import toast from 'react-hot-toast';
+import { AlertCircle, Loader2 } from 'lucide-react';
+import api from '../../api/client.js';
+import Modal from '../ui/Modal.jsx';
+import { Field, Input, Textarea } from '../ui/FormControls.jsx';
+import { getErrorMessage } from '../../utils/format.js';
+
+// room = existing room (edit) or null (add). `rooms` is the current list, used for the duplicate check.
+export default function RoomFormModal({ room, rooms, onClose, onSaved }) {
+  const editing = Boolean(room);
+  const [f, setF] = useState({
+    roomNumber: room?.roomNumber || '',
+    floor: room?.floor || '',
+    monthlyRent: room ? String(room.monthlyRent) : '',
+    capacity: room ? String(room.capacity) : '1',
+    lastMeterReading: '',
+    notes: room?.notes || '',
+  });
+  const [errors, setErrors] = useState({});
+  const [formError, setFormError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const set = (e) => setF((s) => ({ ...s, [e.target.name]: e.target.value }));
+
+  const validate = () => {
+    const e = {};
+    const number = f.roomNumber.trim();
+    if (!number) e.roomNumber = 'Room number is required';
+    else if (rooms.some((r) => r._id !== room?._id && r.roomNumber.toLowerCase() === number.toLowerCase())) {
+      e.roomNumber = 'A room with this number already exists';
+    }
+    if (f.monthlyRent === '' || Number.isNaN(Number(f.monthlyRent)) || Number(f.monthlyRent) < 0) {
+      e.monthlyRent = 'Enter the monthly rent (0 or more)';
+    }
+    const cap = Number(f.capacity);
+    if (!Number.isInteger(cap) || cap < 1 || cap > 20) e.capacity = 'Capacity must be a whole number from 1 to 20';
+    else if (editing && cap < room.currentResidents) {
+      e.capacity = `This room has ${room.currentResidents} active resident(s). Capacity can't be lower.`;
+    }
+    if (!editing && f.lastMeterReading !== '' && Number(f.lastMeterReading) < 0) {
+      e.lastMeterReading = 'Meter reading cannot be negative';
+    }
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const submit = async (ev) => {
+    ev.preventDefault();
+    setFormError('');
+    if (!validate()) return;
+
+    const payload = {
+      roomNumber: f.roomNumber.trim(),
+      floor: f.floor.trim(),
+      monthlyRent: Number(f.monthlyRent),
+      capacity: Number(f.capacity),
+      notes: f.notes.trim(),
+    };
+    if (!editing && f.lastMeterReading !== '') payload.lastMeterReading = Number(f.lastMeterReading);
+
+    setSaving(true);
+    try {
+      const res = editing ? await api.put(`/rooms/${room._id}`, payload) : await api.post('/rooms', payload);
+      toast.success(res.data.message || 'Room saved');
+      onSaved();
+    } catch (err) {
+      const msg = getErrorMessage(err);
+      setFormError(msg.includes('roomNumber') ? 'A room with this number already exists.' : msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal title={editing ? `Edit room ${room.roomNumber}` : 'Add a room'} onClose={onClose} dismissable={!saving}>
+      <form onSubmit={submit} className="space-y-4" noValidate>
+        {formError && (
+          <div className="flex items-start gap-2 rounded-xl bg-rose-50 p-3 text-sm text-rose-700" role="alert">
+            <AlertCircle size={18} className="mt-0.5 shrink-0" /> <span>{formError}</span>
+          </div>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Room number" htmlFor="roomNumber" error={errors.roomNumber} required>
+            <Input id="roomNumber" name="roomNumber" value={f.roomNumber} onChange={set} invalid={!!errors.roomNumber} placeholder="e.g. 101" autoFocus />
+          </Field>
+          <Field label="Floor" htmlFor="floor">
+            <Input id="floor" name="floor" value={f.floor} onChange={set} placeholder="e.g. 1" />
+          </Field>
+          <Field label="Monthly rent (₹)" htmlFor="monthlyRent" error={errors.monthlyRent} required>
+            <Input id="monthlyRent" name="monthlyRent" type="number" inputMode="decimal" min="0" step="any" value={f.monthlyRent} onChange={set} invalid={!!errors.monthlyRent} />
+          </Field>
+          <Field label="Capacity (beds)" htmlFor="capacity" error={errors.capacity} hint="How many residents can stay" required>
+            <Input id="capacity" name="capacity" type="number" inputMode="numeric" min="1" max="20" step="1" value={f.capacity} onChange={set} invalid={!!errors.capacity} />
+          </Field>
+        </div>
+        {!editing && (
+          <Field
+            label="Current meter reading"
+            htmlFor="lastMeterReading"
+            error={errors.lastMeterReading}
+            hint="Optional. Used as the starting point for this room's first electricity bill."
+          >
+            <Input id="lastMeterReading" name="lastMeterReading" type="number" inputMode="decimal" min="0" step="any" value={f.lastMeterReading} onChange={set} invalid={!!errors.lastMeterReading} />
+          </Field>
+        )}
+        <Field label="Notes" htmlFor="notes">
+          <Textarea id="notes" name="notes" value={f.notes} onChange={set} placeholder="Attached bathroom, AC, etc." />
+        </Field>
+        {editing && (
+          <p className="text-xs text-slate-400">
+            Changing the rent only affects residents added and rent generated from now on. Existing records are not changed.
+          </p>
+        )}
+        <div className="flex gap-3 pt-1">
+          <button type="button" onClick={onClose} disabled={saving} className="btn-secondary flex-1">Cancel</button>
+          <button type="submit" disabled={saving} className="btn-primary flex-1">
+            {saving && <Loader2 size={16} className="animate-spin" />}
+            {saving ? 'Saving...' : editing ? 'Save changes' : 'Add room'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
