@@ -9,6 +9,7 @@ import Residents from './pages/Residents.jsx';
 import ResidentProfile from './pages/ResidentProfile.jsx';
 import Attendance from './pages/Attendance.jsx';
 import Rent from './pages/Rent.jsx';
+import Electricity from './pages/Electricity.jsx';
 import PaymentHistory from './pages/PaymentHistory.jsx';
 import ComingSoon from './pages/ComingSoon.jsx';
 
@@ -28,7 +29,7 @@ export default function App() {
           <Route path="residents/:id" element={<ResidentProfile />} />
           <Route path="attendance" element={<Attendance />} />
           <Route path="rent" element={<Rent />} />
-          <Route path="electricity" element={<ComingSoon title="Electricity Bills" step="3E" />} />
+          <Route path="electricity" element={<Electricity />} />
           <Route path="payments" element={<PaymentHistory />} />
           <Route path="reminders" element={<ComingSoon title="Reminders" step="3F" />} />
           <Route path="settings" element={<ComingSoon title="Settings" step="3F" />} />

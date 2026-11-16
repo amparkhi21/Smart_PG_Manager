@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { History, IndianRupee, SearchX, Users } from 'lucide-react';
+﻿import { useMemo, useState } from 'react';
+import { History, IndianRupee, SearchX, Users, Zap } from 'lucide-react';
 import api from '../api/client.js';
 import useFetch from '../hooks/useFetch.js';
 import PageHeader from '../components/ui/PageHeader.jsx';
@@ -13,62 +13,119 @@ import { Select } from '../components/ui/FormControls.jsx';
 import { formatCurrency, formatDateTime, formatMonth, round2 } from '../utils/format.js';
 
 export default function PaymentHistory() {
-  // There is no standalone payment endpoint, so history is built from the payments[] of every rent record.
-  const { data, loading, error, reload } = useFetch(async () => (await api.get('/rent')).data.data, []);
-  const [view, setView] = useState('Transactions');
+  const { data: rentData, loading: rentLoading, error: rentError, reload: reloadRent } = useFetch(async () => (await api.get('/rent')).data.data, []);
+  const { data: elecData, loading: elecLoading, error: elecError, reload: reloadElec } = useFetch(async () => (await api.get('/electricity')).data.data, []);
+
   const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('All');
   const [residentFilter, setResidentFilter] = useState('');
+  const [roomFilter, setRoomFilter] = useState('');
   const [monthFilter, setMonthFilter] = useState('');
+  const [view, setView] = useState('Transactions');
 
-  const records = data || [];
+  const loading = rentLoading || elecLoading;
+  const error = rentError || elecError;
+  const reload = () => { reloadRent(); reloadElec(); };
 
-  const payments = useMemo(
-    () =>
-      records
-        .flatMap((r) =>
-          r.payments.map((p) => ({
-            id: p._id,
-            residentId: r.resident?._id || '',
-            resident: r.resident?.fullName || 'Unknown',
-            room: r.room?.roomNumber || '-',
-            month: r.month,
-            amount: p.amount,
-            paidOn: p.paidOn,
-            method: p.method,
-            note: p.note || '',
-          }))
-        )
-        .sort((a, b) => new Date(b.paidOn) - new Date(a.paidOn)),
-    [records]
-  );
+  const payments = useMemo(() => {
+    const rentPayments = (rentData || []).flatMap((r) =>
+      r.payments.map((p) => ({
+        id: `rent-${r._id}-${p._id}`,
+        type: 'Rent',
+        residentId: r.resident?._id || '',
+        resident: r.resident?.fullName || 'Unknown',
+        roomId: r.room?._id || '',
+        room: r.room?.roomNumber || '-',
+        month: r.month,
+        amount: p.amount,
+        paidOn: p.paidOn,
+        method: p.method,
+        note: p.note || '',
+      }))
+    );
+
+    const elecPayments = (elecData || []).flatMap((b) =>
+      b.payments.map((p) => ({
+        id: `electricity-${b._id}-${p._id}`,
+        type: 'Electricity',
+        residentId: b.room?._id || '',
+        resident: `Room ${b.room?.roomNumber || '-'}`,
+        roomId: b.room?._id || '',
+        room: b.room?.roomNumber || '-',
+        month: b.month,
+        amount: p.amount,
+        paidOn: p.paidOn,
+        method: p.method,
+        note: p.note || '',
+      }))
+    );
+
+    return [...rentPayments, ...elecPayments].sort((a, b) => new Date(b.paidOn) - new Date(a.paidOn));
+  }, [rentData, elecData]);
 
   const residents = useMemo(() => {
     const map = new Map();
-    records.forEach((r) => r.resident && map.set(r.resident._id, `${r.resident.fullName} (Room ${r.room?.roomNumber || '-'})`));
+    (rentData || []).forEach((r) => {
+      if (r.resident) map.set(r.resident._id, `${r.resident.fullName} (Room ${r.room?.roomNumber || '-'})`);
+    });
+    (elecData || []).forEach((b) => {
+      if (b.room) map.set(b.room._id, `Room ${b.room.roomNumber}`);
+    });
     return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [records]);
-  const months = useMemo(() => [...new Set(records.map((r) => r.month))].sort().reverse(), [records]);
+  }, [rentData, elecData]);
+
+  const rooms = useMemo(() => {
+    const map = new Map();
+    [...(rentData || []), ...(elecData || [])].forEach((item) => {
+      const room = item.room || item;
+      if (room && room._id && room.roomNumber) map.set(room._id, `Room ${room.roomNumber}`);
+    });
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [rentData, elecData]);
+
+  const months = useMemo(() => {
+    const set = new Set();
+    (rentData || []).forEach((r) => set.add(r.month));
+    (elecData || []).forEach((b) => set.add(b.month));
+    return [...set].sort().reverse();
+  }, [rentData, elecData]);
 
   const term = search.trim().toLowerCase();
   const filtered = payments.filter(
     (p) =>
+      (typeFilter === 'All' || p.type === typeFilter) &&
       (!residentFilter || p.residentId === residentFilter) &&
+      (!roomFilter || p.roomId === roomFilter) &&
       (!monthFilter || p.month === monthFilter) &&
-      (!term || `${p.resident} ${p.room} ${p.method} ${p.note}`.toLowerCase().includes(term))
+      (!term || `${p.resident} ${p.room} ${p.method} ${p.note} ${p.type}`.toLowerCase().includes(term))
   );
-  const total = round2(filtered.reduce((s, p) => s + p.amount, 0));
-  const filtersActive = Boolean(term) || Boolean(residentFilter) || Boolean(monthFilter);
+
+  const totals = filtered.reduce(
+    (acc, p) => {
+      acc.total += p.amount;
+      acc[p.type] += p.amount;
+      return acc;
+    },
+    { total: 0, Rent: 0, Electricity: 0 }
+  );
+
+  const filtersActive = Boolean(typeFilter !== 'All') || Boolean(term) || Boolean(residentFilter) || Boolean(roomFilter) || Boolean(monthFilter);
   const clearFilters = () => {
+    setTypeFilter('All');
     setSearch('');
     setResidentFilter('');
+    setRoomFilter('');
     setMonthFilter('');
   };
 
   const grouped = useMemo(() => {
     const map = new Map();
     filtered.forEach((p) => {
-      if (!map.has(p.residentId)) map.set(p.residentId, { id: p.residentId, name: p.resident, room: p.room, total: 0, items: [] });
-      const g = map.get(p.residentId);
+      const key = `${p.type}-${p.residentId}`;
+      if (!map.has(key)) {
+        map.set(key, { id: key, name: p.resident, room: p.room, total: 0, items: [] });
+      }
+      const g = map.get(key);
       g.total = round2(g.total + p.amount);
       g.items.push(p);
     });
@@ -77,22 +134,23 @@ export default function PaymentHistory() {
 
   return (
     <div>
-      <PageHeader title="Payment History" subtitle="Rent payments, every installment" />
+      <PageHeader title="Payment History" subtitle="Rent and electricity payments" />
 
-      {loading && !data ? (
+      {loading && !payments.length ? (
         <div className="space-y-3">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-20" />)}</div>
-      ) : error && !data ? (
+      ) : error && !payments.length ? (
         <ErrorState message={error} onRetry={reload} />
       ) : payments.length === 0 ? (
         <div className="card">
-          <EmptyState icon={History} title="No payments recorded yet" text="Rent payments you record on the Rent page appear here." />
+          <EmptyState icon={History} title="No payments recorded yet" text="Payment entries from Rent and Electricity pages appear here." />
         </div>
       ) : (
         <>
-          <div className="mb-5 grid grid-cols-3 gap-2 sm:gap-3">
-            <StatCard icon={IndianRupee} label="Collected" value={formatCurrency(total)} tone="emerald" />
+          <div className="mb-5 grid grid-cols-4 gap-2 sm:gap-3">
+            <StatCard icon={IndianRupee} label="Collected" value={formatCurrency(totals.total)} tone="emerald" />
+            <StatCard icon={IndianRupee} label="Rent" value={formatCurrency(totals.Rent)} tone="navy" />
+            <StatCard icon={Zap} label="Electricity" value={formatCurrency(totals.Electricity)} tone="teal" />
             <StatCard icon={History} label="Payments" value={filtered.length} tone="navy" />
-            <StatCard icon={Users} label="Residents" value={new Set(filtered.map((p) => p.residentId)).size} tone="teal" />
           </div>
 
           <div className="mb-4 space-y-3">
@@ -102,7 +160,11 @@ export default function PaymentHistory() {
                 <option value="">All residents</option>
                 {residents.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
               </Select>
-              <Select value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} aria-label="Filter by rent month" className="md:w-48">
+              <Select value={roomFilter} onChange={(e) => setRoomFilter(e.target.value)} aria-label="Filter by room" className="md:w-48">
+                <option value="">All rooms</option>
+                {rooms.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+              </Select>
+              <Select value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} aria-label="Filter by billing month" className="md:w-48">
                 <option value="">All months</option>
                 {months.map((m) => <option key={m} value={m}>{formatMonth(m)}</option>)}
               </Select>
@@ -111,11 +173,14 @@ export default function PaymentHistory() {
                 <SegmentedControl options={['Transactions', 'By resident']} value={view} onChange={setView} />
               </div>
             </div>
+            <div className="md:flex md:justify-end">
+              <SegmentedControl options={['All', 'Rent', 'Electricity']} value={typeFilter} onChange={setTypeFilter} />
+            </div>
           </div>
 
           {filtered.length === 0 ? (
             <div className="card">
-              <EmptyState icon={SearchX} title="No payments match" text="Try different filters." action={<button className="btn-secondary" onClick={clearFilters}>Clear filters</button>} />
+              <EmptyState icon={SearchX} title="No payments match" text="Try different filters or date ranges." action={<button className="btn-secondary" onClick={clearFilters}>Clear filters</button>} />
             </div>
           ) : view === 'Transactions' ? (
             <>
@@ -125,9 +190,10 @@ export default function PaymentHistory() {
                     <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                       <tr>
                         <th className="px-4 py-3 font-semibold">Date and time</th>
-                        <th className="px-4 py-3 font-semibold">Resident</th>
+                        <th className="px-4 py-3 font-semibold">Type</th>
+                        <th className="px-4 py-3 font-semibold">Resident / Room</th>
                         <th className="px-4 py-3 font-semibold">Room</th>
-                        <th className="px-4 py-3 font-semibold">Rent month</th>
+                        <th className="px-4 py-3 font-semibold">Billing month</th>
                         <th className="px-4 py-3 font-semibold">Method</th>
                         <th className="px-4 py-3 font-semibold">Reference / note</th>
                         <th className="px-4 py-3 text-right font-semibold">Amount</th>
@@ -137,6 +203,11 @@ export default function PaymentHistory() {
                       {filtered.map((p) => (
                         <tr key={p.id}>
                           <td className="whitespace-nowrap px-4 py-3 text-slate-600">{formatDateTime(p.paidOn)}</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${p.type === 'Rent' ? 'bg-navy-50 text-navy-700' : 'bg-teal-50 text-teal-700'}`}>
+                              {p.type}
+                            </span>
+                          </td>
                           <td className="px-4 py-3 font-semibold text-slate-900">{p.resident}</td>
                           <td className="px-4 py-3 text-slate-700">{p.room}</td>
                           <td className="px-4 py-3 text-slate-600">{formatMonth(p.month)}</td>
@@ -156,11 +227,15 @@ export default function PaymentHistory() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="truncate font-semibold text-slate-900">{p.resident}</p>
-                        <p className="text-xs text-slate-500">Room {p.room} · Rent for {formatMonth(p.month)}</p>
+                        <p className="text-xs text-slate-500">{p.type} · Room {p.room} · {formatMonth(p.month)}</p>
                       </div>
                       <span className="shrink-0 font-bold text-emerald-600">+{formatCurrency(p.amount)}</span>
                     </div>
-                    <p className="mt-2 text-xs text-slate-500">{formatDateTime(p.paidOn)} · {p.method}</p>
+                    <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+                      <span className={`inline-flex rounded-full px-2 py-1 font-semibold ${p.type === 'Rent' ? 'bg-navy-50 text-navy-700' : 'bg-teal-50 text-teal-700'}`}>{p.type}</span>
+                      <span>{p.method}</span>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">{formatDateTime(p.paidOn)}</p>
                     {p.note && <p className="mt-1 break-words text-xs text-slate-500">{p.note}</p>}
                   </li>
                 ))}
@@ -169,12 +244,12 @@ export default function PaymentHistory() {
           ) : (
             <ul className="space-y-3">
               {grouped.map((g) => (
-                <li key={g.id || g.name} className="card overflow-hidden">
+                <li key={g.id} className="card overflow-hidden">
                   <details>
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
                       <div className="min-w-0">
                         <p className="truncate font-semibold text-slate-900">{g.name}</p>
-                        <p className="text-xs text-slate-500">Room {g.room} · {g.items.length} payment{g.items.length === 1 ? '' : 's'}</p>
+                        <p className="text-xs text-slate-500">{g.items[0]?.type} · Room {g.room} · {g.items.length} payment{g.items.length === 1 ? '' : 's'}</p>
                       </div>
                       <span className="shrink-0 font-bold text-emerald-600">{formatCurrency(g.total)}</span>
                     </summary>
@@ -184,7 +259,7 @@ export default function PaymentHistory() {
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-slate-800">{formatDateTime(p.paidOn)}</p>
                             <p className="truncate text-xs text-slate-500">
-                              {p.method} · Rent for {formatMonth(p.month)}{p.note ? ` · ${p.note}` : ''}
+                              {p.type} · {p.method} · {formatMonth(p.month)}{p.note ? ` · ${p.note}` : ''}
                             </p>
                           </div>
                           <span className="shrink-0 text-sm font-bold text-emerald-600">+{formatCurrency(p.amount)}</span>
@@ -198,7 +273,7 @@ export default function PaymentHistory() {
           )}
 
           <p className="mt-4 text-xs leading-relaxed text-slate-400">
-            Payment records are permanent and read-only. This page shows rent payments only; electricity payments will be added with the Electricity module.
+            Payment records are permanent and read-only. This combined history covers all logged rent and electricity payments for all relevant billing months, not just the current month.
           </p>
         </>
       )}
