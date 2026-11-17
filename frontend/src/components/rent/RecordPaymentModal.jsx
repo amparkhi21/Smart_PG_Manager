@@ -19,12 +19,16 @@ const Fact = ({ label, value, accent }) => (
 export default function RecordPaymentModal({ record, onClose, onSaved }) {
   const today = todayInput();
   const [f, setF] = useState({ amount: '', method: 'Cash', date: today, note: '' });
+  const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const set = (e) => setF((s) => ({ ...s, [e.target.name]: e.target.value }));
+  const set = (e) => {
+    setF((s) => ({ ...s, [e.target.name]: e.target.value }));
+    setRequestId(crypto.randomUUID());
+  };
   const amount = round2(Number(f.amount));
   const balanceAfter = round2(record.balance - amount);
 
@@ -48,7 +52,7 @@ export default function RecordPaymentModal({ record, onClose, onSaved }) {
     if (saving) return; // no duplicate submissions
     setSaving(true);
     try {
-      const payload = { amount, method: f.method };
+      const payload = { amount, method: f.method, requestId };
       // For today the server stamps the real time. Earlier dates are saved as noon India time.
       if (f.date !== today) payload.paidOn = `${f.date}T12:00:00+05:30`;
       if (f.note.trim()) payload.note = f.note.trim();
@@ -86,7 +90,10 @@ export default function RecordPaymentModal({ record, onClose, onSaved }) {
             <div className="flex gap-2">
               <Input id="amount" name="amount" type="number" inputMode="decimal" min="0" step="any" value={f.amount}
                 onChange={set} invalid={!!errors.amount} placeholder="0" autoFocus />
-              <button type="button" className="btn-secondary shrink-0" onClick={() => setF((s) => ({ ...s, amount: String(record.balance) }))}>
+              <button type="button" className="btn-secondary shrink-0" onClick={() => {
+                setF((s) => ({ ...s, amount: String(record.balance) }));
+                setRequestId(crypto.randomUUID());
+              }}>
                 Full balance
               </button>
             </div>

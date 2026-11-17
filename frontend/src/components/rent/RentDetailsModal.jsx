@@ -1,12 +1,15 @@
 import { Link } from 'react-router-dom';
-import { IndianRupee } from 'lucide-react';
+import { Download, IndianRupee } from 'lucide-react';
+import toast from 'react-hot-toast';
 import api from '../../api/client.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 import useFetch from '../../hooks/useFetch.js';
 import Modal from '../ui/Modal.jsx';
 import Skeleton from '../ui/Skeleton.jsx';
 import ErrorState from '../ui/ErrorState.jsx';
 import StatusBadge from '../ui/StatusBadge.jsx';
 import { formatCurrency, formatDate, formatDateTime, formatMonth } from '../../utils/format.js';
+import { downloadPaymentReceipt } from '../../utils/pdf.js';
 
 const Fact = ({ label, value }) => (
   <div className="rounded-xl bg-slate-50 p-3">
@@ -17,6 +20,7 @@ const Fact = ({ label, value }) => (
 
 // Loads the record from GET /rent/:id. onRecordPayment(record) opens the payment form.
 export default function RentDetailsModal({ recordId, onClose, onRecordPayment }) {
+  const { owner } = useAuth();
   const { data: r, loading, error, reload } = useFetch(async () => (await api.get(`/rent/${recordId}`)).data.data, [recordId]);
 
   const installments = r ? [...r.payments].sort((a, b) => new Date(a.paidOn) - new Date(b.paidOn)) : [];
@@ -70,12 +74,30 @@ export default function RentDetailsModal({ recordId, onClose, onRecordPayment })
             ) : (
               <ul className="divide-y divide-slate-100 rounded-xl border border-slate-100">
                 {installments.map((p, i) => (
-                  <li key={p._id} className="flex items-center justify-between gap-3 px-3 py-3">
+                  <li key={p._id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-3">
                     <div className="min-w-0">
                       <p className="font-semibold text-slate-800">Installment {i + 1}</p>
                       <p className="truncate text-xs text-slate-500">{formatDateTime(p.paidOn)} · {p.method}{p.note ? ` · ${p.note}` : ''}</p>
                     </div>
-                    <span className="shrink-0 font-bold text-emerald-600">+{formatCurrency(p.amount)}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="shrink-0 font-bold text-emerald-600">+{formatCurrency(p.amount)}</span>
+                      {p._id && (
+                        <button
+                          type="button"
+                          className="btn-secondary min-h-9 px-2.5"
+                          onClick={async () => {
+                            try {
+                              await downloadPaymentReceipt('Rent', r, p, owner);
+                            } catch (err) {
+                              toast.error(err.message || 'Could not create receipt');
+                            }
+                          }}
+                          aria-label={`Download receipt for installment ${i + 1}`}
+                        >
+                          <Download size={15} /> Receipt
+                        </button>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>

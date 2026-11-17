@@ -60,6 +60,7 @@ The system is designed to provide clearer visibility into property occupancy and
 - Generate monthly rent records
 - Track billed, paid, pending, and overdue rent
 - Record partial and full payments
+- Apply payment submissions atomically against the current balance and make retry IDs idempotent
 - Preserve individual payment installments
 - View resident-wise balances and payment history
 - Prevent duplicate rent generation and overpayments
@@ -83,6 +84,29 @@ The system is designed to provide clearer visibility into property occupancy and
 - Monitor rent billed, collected, and pending
 - Track electricity billing and outstanding amounts
 - Review important PG management summaries in one place
+
+### 💬 WhatsApp Reminder Preparation & PG Settings
+
+- Review unpaid rent and room-based electricity bills using current backend records
+- Prepare individual WhatsApp click-to-chat messages with editable previews
+- Select a current active resident explicitly for room electricity bills
+- Review owner-scoped reminder history with draft, WhatsApp-opened, and owner-reported statuses
+- Configure property details, future billing defaults, duplicate-warning preferences, and message templates
+- Bulk-prepare reminder drafts without automatically sending messages
+
+*WhatsApp messages are never sent by the application. Owners review and manually send each message in WhatsApp; no delivery or read status is claimed.*
+
+### 📑 Payment Receipts, Reports & Exports
+
+- Download an individual rent or electricity payment receipt using its persisted payment transaction ID.
+- Receipts state “Payment Recorded”; they do not claim bank verification or tax-invoice status.
+- Review monthly billed amounts, collections against those billing records, current balances, and payments received by transaction date as separate measures.
+- Download a monthly PDF report and UTF-8 CSV exports for rooms, residents, attendance, rent, electricity, payments, and financial summaries.
+- CSV exports omit resident contact and emergency-contact details; formula-leading text is escaped.
+
+*The authenticated `GET /api/reports?month=YYYY-MM` endpoint is read-only and returns only the logged-in owner’s reporting data.*
+
+*Payment endpoints use conditional atomic balance updates; repeated submissions carrying the same request ID do not append another installment.*
 
 ### 🔐 Authentication & Data Security
 
@@ -180,6 +204,8 @@ smart-pg-manager/
 
 ## 🚀 Installation & Setup
 
+Use Node.js 20 or newer for the frontend (React Router 7 requirement). The backend package currently supports Node.js 18 or newer.
+
 ### 1. Clone the Repository
 
 ```bash
@@ -251,6 +277,12 @@ npm.cmd run build
 
 A successful build checks that the frontend can be bundled. It does not replace browser testing or backend integration tests.
 
+Run the frontend utility/receipt/report tests from `frontend/` and the backend model/API smoke tests from `server/` with:
+
+```powershell
+npm.cmd test
+```
+
 **Security note:** Never upload `.env` files, database passwords, JWT secrets, or real resident personal information to GitHub. Do not run database seed scripts against data you intend to preserve.
 
 ## 🔄 Application Workflow
@@ -280,7 +312,7 @@ Smart PG Manager is being developed to demonstrate practical skills in:
 
 ## 🔮 Future Enhancements
 
-Planned improvements include WhatsApp reminders for pending rent and electricity payments, downloadable receipts, reports and exports, enhanced analytics, configurable property settings, and public deployment.
+Planned improvements include downloadable receipts, reports and exports, enhanced analytics, and public deployment. Direct WhatsApp Business Platform messaging, if added, will require explicit owner authorization and the appropriate business credentials and consent.
 
 ## 👩‍💻 Author
 

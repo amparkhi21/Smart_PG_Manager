@@ -1,6 +1,8 @@
 ﻿import { useMemo, useState } from 'react';
-import { History, IndianRupee, SearchX, Users, Zap } from 'lucide-react';
+import { Download, History, IndianRupee, SearchX, Users, Zap } from 'lucide-react';
+import toast from 'react-hot-toast';
 import api from '../api/client.js';
+import { useAuth } from '../context/AuthContext.jsx';
 import useFetch from '../hooks/useFetch.js';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import StatCard from '../components/ui/StatCard.jsx';
@@ -11,8 +13,10 @@ import EmptyState from '../components/ui/EmptyState.jsx';
 import ErrorState from '../components/ui/ErrorState.jsx';
 import { Select } from '../components/ui/FormControls.jsx';
 import { formatCurrency, formatDateTime, formatMonth, round2 } from '../utils/format.js';
+import { downloadPaymentReceipt } from '../utils/pdf.js';
 
 export default function PaymentHistory() {
+  const { owner } = useAuth();
   const { data: rentData, loading: rentLoading, error: rentError, reload: reloadRent } = useFetch(async () => (await api.get('/rent')).data.data, []);
   const { data: elecData, loading: elecLoading, error: elecError, reload: reloadElec } = useFetch(async () => (await api.get('/electricity')).data.data, []);
 
@@ -32,6 +36,8 @@ export default function PaymentHistory() {
       r.payments.map((p) => ({
         id: `rent-${r._id}-${p._id}`,
         type: 'Rent',
+        payment: p,
+        sourceRecord: r,
         residentId: r.resident?._id || '',
         resident: r.resident?.fullName || 'Unknown',
         roomId: r.room?._id || '',
@@ -41,6 +47,7 @@ export default function PaymentHistory() {
         paidOn: p.paidOn,
         method: p.method,
         note: p.note || '',
+        receiptReady: Boolean(p._id),
       }))
     );
 
@@ -48,6 +55,8 @@ export default function PaymentHistory() {
       b.payments.map((p) => ({
         id: `electricity-${b._id}-${p._id}`,
         type: 'Electricity',
+        payment: p,
+        sourceRecord: b,
         residentId: b.room?._id || '',
         resident: `Room ${b.room?.roomNumber || '-'}`,
         roomId: b.room?._id || '',
@@ -57,6 +66,7 @@ export default function PaymentHistory() {
         paidOn: p.paidOn,
         method: p.method,
         note: p.note || '',
+        receiptReady: Boolean(p._id),
       }))
     );
 
@@ -116,6 +126,13 @@ export default function PaymentHistory() {
     setResidentFilter('');
     setRoomFilter('');
     setMonthFilter('');
+  };
+  const downloadReceipt = async (payment) => {
+    try {
+      await downloadPaymentReceipt(payment.type, payment.sourceRecord, payment.payment, owner);
+    } catch (err) {
+      toast.error(err.message || 'Could not create receipt');
+    }
   };
 
   const grouped = useMemo(() => {
@@ -197,6 +214,7 @@ export default function PaymentHistory() {
                         <th className="px-4 py-3 font-semibold">Method</th>
                         <th className="px-4 py-3 font-semibold">Reference / note</th>
                         <th className="px-4 py-3 text-right font-semibold">Amount</th>
+                        <th className="px-4 py-3 text-right font-semibold">Receipt</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -214,6 +232,9 @@ export default function PaymentHistory() {
                           <td className="px-4 py-3 text-slate-600">{p.method}</td>
                           <td className="max-w-56 truncate px-4 py-3 text-slate-500" title={p.note}>{p.note || '-'}</td>
                           <td className="px-4 py-3 text-right font-bold text-emerald-600">+{formatCurrency(p.amount)}</td>
+                          <td className="px-4 py-3 text-right">
+                            {p.receiptReady && <button className="btn-secondary min-h-9 px-2.5" onClick={() => downloadReceipt(p)}><Download size={15} /> PDF</button>}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -237,6 +258,7 @@ export default function PaymentHistory() {
                     </div>
                     <p className="mt-2 text-xs text-slate-500">{formatDateTime(p.paidOn)}</p>
                     {p.note && <p className="mt-1 break-words text-xs text-slate-500">{p.note}</p>}
+                    {p.receiptReady && <button className="btn-secondary mt-3 min-h-9" onClick={() => downloadReceipt(p)}><Download size={15} /> Download receipt</button>}
                   </li>
                 ))}
               </ul>
@@ -263,6 +285,7 @@ export default function PaymentHistory() {
                             </p>
                           </div>
                           <span className="shrink-0 text-sm font-bold text-emerald-600">+{formatCurrency(p.amount)}</span>
+                          {p.receiptReady && <button className="btn-secondary min-h-9 shrink-0 px-2.5" onClick={() => downloadReceipt(p)} aria-label={`Download ${p.type.toLowerCase()} receipt`}><Download size={15} /> PDF</button>}
                         </li>
                       ))}
                     </ul>

@@ -3,7 +3,7 @@ import Room from '../models/Room.js';
 import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { findOwned } from '../utils/ownership.js';
-import { refreshOverdue, appendPayment, round2 } from '../utils/billing.js';
+import { refreshOverdue, appendPaymentAtomically, round2 } from '../utils/billing.js';
 import { dueDateFor } from '../utils/dates.js';
 
 const POPULATE = [{ path: 'room', select: 'roomNumber' }];
@@ -95,9 +95,16 @@ export const getBill = asyncHandler(async (req, res) => {
 });
 
 export const addBillPayment = asyncHandler(async (req, res) => {
-  const bill = await findOwned(ElectricityBill, req.params.id, req);
-  appendPayment(bill, req.body);
-  await bill.save();
+  const bill = await appendPaymentAtomically(ElectricityBill, req.owner._id, req.params.id, req.body);
+  if (!bill) {
+    const current = await findOwned(ElectricityBill, req.params.id, req);
+    if (req.body.requestId && current.payments.some((payment) => payment.requestId === req.body.requestId)) {
+      await current.populate(POPULATE);
+      return res.json({ success: true, message: 'This payment was already recorded', data: current });
+    }
+    if (current.balance <= 0) throw new ApiError(409, 'This bill is already fully paid');
+    throw new ApiError(400, `Payment of ₹${round2(req.body.amount)} is more than the pending balance of ₹${current.balance}`);
+  }
   await bill.populate(POPULATE);
   res.status(201).json({
     success: true,

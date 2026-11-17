@@ -9,10 +9,12 @@ const publicOwner = (o) => ({
   email: o.email,
   phone: o.phone,
   pgName: o.pgName,
+  address: o.address,
   timezone: o.timezone,
   currency: o.currency,
   defaultElectricityRate: o.defaultElectricityRate,
   rentDueDay: o.rentDueDay,
+  reminderSettings: o.reminderSettings,
   isDemo: o.isDemo,
 });
 
