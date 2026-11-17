@@ -1,89 +1,121 @@
-﻿# Smart PG Manager
+# Smart PG Manager
 
-A React and Express application for PG owners to manage occupancy, residents, attendance, rent, electricity, and recorded payments.
+A responsive application for paying guest (PG) property owners to manage rooms, residents, attendance, rent, electricity bills, payments, and reports.
 
-The application modules are implemented. The frontend is hosted at https://smart-pg-manager.vercel.app and the API at https://smart-pg-manager-backend.onrender.com. The local production-connectivity fix requires a new Vercel deployment. See [deployment instructions](DEPLOYMENT.md) for configuration and [the Phase 5A readiness report](PHASE5A_READINESS.md) for the earlier preparation evidence and current follow-up.
+[Frontend](https://smart-pg-manager.vercel.app) · [API health](https://smart-pg-manager-backend.onrender.com/api/health) · [Deployment guide](DEPLOYMENT.md) · [GitHub Actions](https://github.com/amparkhi21/Smart_PG_Manager/actions/workflows/verify.yml)
 
-## Implemented functionality
+## Features
 
-- Owner registration/login, HS256 JWT sessions, protected routes, and owner-scoped backend queries.
-- Dashboard occupancy and financial summaries.
-- Rooms with capacity, rent, occupancy, duplicate-number checks, and deletion restrictions for historical records.
-- Residents with room assignment, profile/history views, leave handling, and capacity checks.
-- Daily/bulk attendance and monthly attendance summaries.
-- Monthly rent generation, partial/full payments, conditional atomic balance checks, and payment retry IDs.
-- Room electricity readings, calculated bills, installment payments, and payment history.
-- Individual rent/electricity PDF receipts based on persisted payment IDs. Receipts say Payment Recorded; they are not bank verification or tax invoices.
-- WhatsApp reminder drafts, editable previews, click-to-chat links, duplicate warnings, and owner-reported activity. The app does not automatically send messages or claim delivery/read status.
-- Property settings, future billing defaults, reminder preferences, and message templates.
-- Read-only monthly reports and PDF exports, separating billing-month collections from transaction-date receipts in Asia/Kolkata.
-- Eight CSV exports: rooms, residents, attendance, rent records, rent payments, electricity bills, electricity payments, and monthly summary. Resident contact fields are omitted, and formula-leading strings are escaped.
+- **Owner accounts:** registration, login, JWT sessions, protected pages, and owner-scoped API queries.
+- **Dashboard:** occupancy, collections, outstanding balances, recent payments, and upcoming dues.
+- **Rooms and residents:** capacity checks, room assignments, resident profiles, and preserved history when residents leave.
+- **Attendance:** daily and bulk marking, notes, and monthly summaries.
+- **Rent:** monthly generation, partial and full payments, atomic balance checks, and payment retry IDs.
+- **Electricity:** meter readings, calculated room bills, installment payments, and payment history.
+- **Receipts:** downloadable rent and electricity PDFs tied to saved payment IDs. Receipts identify payments as recorded; they do not verify bank settlement or serve as tax invoices.
+- **Reminders:** editable WhatsApp drafts, click-to-chat links, duplicate warnings, and owner-reported activity. Sending remains manual.
+- **Settings:** property details, future billing defaults, reminder preferences, and message templates.
+- **Reports:** monthly financial summaries and PDFs, with billing-month collections separated from transaction-date receipts in Asia/Kolkata.
+- **CSV exports:** rooms, residents, attendance, rent records, rent payments, electricity bills, electricity payments, and monthly summaries. Resident contact fields are excluded and formula-leading text is escaped.
 
-The source and selected automated behaviors have been verified. These statements do not imply full browser or live-database acceptance coverage for every module; the readiness report describes the limits.
+## Technology
 
-## Stack and structure
-
-| Component | Technology / intended host |
+| Layer | Stack |
 | --- | --- |
-| Frontend | React 18, Vite 6, Tailwind CSS, Axios, React Router / Vercel |
-| Backend | Node 24, Express 4, Mongoose, JWT / Render |
-| Database | Existing MongoDB Atlas database |
-| Receipts/charts | jsPDF / Recharts |
-| Version control | Git / GitHub |
+| Frontend | React 18, Vite 6, Tailwind CSS, React Router, Axios |
+| Backend | Node.js 24, Express 4, Mongoose, JWT |
+| Database | MongoDB Atlas |
+| Charts and documents | Recharts, jsPDF |
+| Hosting | Vercel frontend, Render API |
 
-- `frontend/src/`: pages, reusable components, authentication context, API client, and export utilities.
-- `server/src/`: routes, controllers, models, validation, authentication, and startup configuration.
-- `server/test/`: synthetic model/controller and HTTP security tests; no live-database writes.
-- `frontend/scripts/verify-build.mjs`: production export/link artifact checks using synthetic data.
-- `.github/workflows/verify.yml`: Node 24 tests, audits, build, and Git hygiene checks; no deployment or secrets.
-- `render.yaml` and `frontend/vercel.json`: optional backend blueprint and frontend SPA routing/build configuration.
+## Getting started
 
-## Local setup (Windows PowerShell)
+Use **Node.js 24** and npm. In Windows PowerShell, use `npm.cmd` if execution policy blocks `npm.ps1`.
 
-Use Node 24 and `npm.cmd`. From the project root, install dependencies with `npm.cmd ci --prefix server` and `npm.cmd ci --prefix frontend`.
+Install the locked dependencies from the repository root:
 
-If `.env` files do not already exist, copy `server/.env.example` to `server/.env` and `frontend/.env.example` to `frontend/.env`. Do not overwrite existing configuration. Replace placeholders privately. The backend reads `NODE_ENV`, `PORT`, `MONGO_URI`, `JWT_SECRET`, `JWT_EXPIRES_IN`, and `CLIENT_URL`. The frontend reads `VITE_API_BASE_URL`.
-
-For local development, use `NODE_ENV=development`, `CLIENT_URL=http://localhost:5173`, and `VITE_API_BASE_URL=http://localhost:5000/api`. The frontend also supports an unset API URL during development through Vite's `/api` proxy to port 5000. Set a valid MongoDB connection and a unique JWT secret of at least 32 characters. Never run seed scripts against existing data.
-
-Run these in separate terminals:
-
-```powershell
-npm.cmd run dev --prefix server
+```sh
+npm ci --prefix server
+npm ci --prefix frontend
 ```
 
-```powershell
-npm.cmd run dev --prefix frontend
+If local environment files are missing, copy [server/.env.example](server/.env.example) to `server/.env` and [frontend/.env.example](frontend/.env.example) to `frontend/.env`. Preserve any existing configuration and fill in placeholders privately.
+
+| Package | Local configuration |
+| --- | --- |
+| Backend | `NODE_ENV=development`, `PORT=5000`, a valid `MONGO_URI`, a unique `JWT_SECRET` of at least 32 characters, `JWT_EXPIRES_IN=7d`, `CLIENT_URL=http://localhost:5173` |
+| Frontend | `VITE_API_BASE_URL=http://localhost:5000/api`; when unset in development, Vite proxies `/api` to port 5000 |
+
+Run the API and frontend in separate terminals:
+
+```sh
+npm run dev --prefix server
 ```
 
-Open `http://localhost:5173`. Backend liveness is `GET /api/health`; database readiness is `GET /api/ready`. A read-only connectivity check is available through `npm.cmd run check:db --prefix server`.
+```sh
+npm run dev --prefix frontend
+```
+
+Open `http://localhost:5173`. Use an isolated development database for write testing. The optional `npm run seed --prefix server` command creates demo data and replaces the demo account's existing records; use it only with a disposable development database.
 
 ## Tests and production build
 
-```powershell
-npm.cmd test --prefix server
-npm.cmd test --prefix frontend
-npm.cmd audit --prefix server
-npm.cmd audit --prefix frontend
-Push-Location frontend
-$env:VITE_API_BASE_URL = 'https://smart-pg-manager-backend.onrender.com/api'
-npm.cmd run build
-npm.cmd run test:build
-Remove-Item Env:VITE_API_BASE_URL
-Pop-Location
+Run from the repository root:
+
+```sh
+npm test --prefix server
+npm test --prefix frontend
+npm run build --prefix frontend
+npm run test:build --prefix frontend
+npm audit --audit-level=moderate --prefix server
+npm audit --audit-level=moderate --prefix frontend
 node scripts/check-repository.mjs
 ```
 
-`VITE_API_BASE_URL` is the primary public API configuration. Production uses `https://smart-pg-manager-backend.onrender.com/api` if the variable is missing or points to localhost/loopback, including when a local development `.env` is present. A valid configured HTTPS backend overrides the fallback. Invalid paths, duplicated `/api`, embedded credentials, and non-HTTPS public API URLs are rejected. Vite embeds the resolved URL at build time, so changing Vercel configuration requires a new deployment. The frontend output is `frontend/dist`.
+The production output is `frontend/dist`. `npm run preview --prefix frontend` serves that build locally. To target a different backend, set `VITE_API_BASE_URL` to its public HTTPS URL ending in `/api` before building. Missing or loopback production values resolve to `https://smart-pg-manager-backend.onrender.com/api`; malformed URLs are rejected.
 
-## Deployment and data protection
+Tests cover API access control, configuration, CORS, sessions, model validation, payment updates, reporting, reminders, and exports using synthetic data and mocks. The production artifact check verifies compiled API URLs, receipt/report PDFs, all eight CSV formats, and reminder links. Hosted browser behavior and complete database workflows still need release acceptance testing.
 
-Follow [DEPLOYMENT.md](DEPLOYMENT.md) manually. The backend uses environment-based CORS, one trusted Render proxy hop, auth rate limiting, Helmet, safe production errors, a database readiness check, and graceful shutdown. Authentication uses bearer tokens rather than cross-site cookies. Temporary network failures preserve the saved token; confirmed protected-API 401 responses clear it.
+[GitHub Actions](.github/workflows/verify.yml) runs the automated tests, dependency audits, production build, artifact checks, and Git hygiene checks on Node.js 24. It does not deploy or use database credentials.
 
-`server/.env` existed in earlier Git history. Rotate the database credentials and JWT secret before pushing or deploying. The file and dependencies have been removed from current Git tracking, while local copies are retained. History has not been rewritten. Never commit credentials, resident data exports, backups, or private keys.
+## Project structure
 
-Render Free sleeps when idle. Vercel Hobby is limited to personal/non-commercial use; confirm eligibility for the intended use before deploying a commercial PG operation. No paid services, automatic messages, seed runs, Git pushes, cloud deployments, or mobile development are part of this preparation.
+```text
+.github/workflows/       Automated verification
+frontend/
+  scripts/              Production artifact verification
+  src/
+    api/                API configuration and HTTP client
+    components/         Shared and feature-specific UI
+    context/            Authentication state
+    hooks/              Fetching and debounce helpers
+    layouts/            Application and authentication layouts
+    pages/              Application screens
+    utils/              Formatting, dates, receipts, reports, and reminders
+  vercel.json           Vercel build settings, headers, and SPA routing
+server/
+  scripts/              Read-only database connectivity check
+  src/
+    config/             Environment validation and database connection
+    controllers/        Request handlers
+    middleware/         Authentication, validation, and error handling
+    models/             MongoDB schemas
+    routes/             API endpoints
+    seed/               Optional development demo data
+    utils/              Shared billing, ownership, and date helpers
+  test/                 Backend automated tests
+scripts/                Repository hygiene checks
+render.yaml             Render service blueprint
+```
+
+## Deployment and data
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for Render and Vercel settings, environment variables, Atlas access, release checks, and troubleshooting. `GET /api/health` checks API liveness; `GET /api/ready` checks database readiness. `npm run check:db --prefix server` performs a read-only MongoDB ping.
+
+Keep `.env` files, private keys, database backups, and resident data exports out of Git. **`server/.env` exists in earlier Git history.** Removing it from tracking does not remove that history; rotate the exposed database credentials and JWT secret before publishing or deploying. Coordinate rotation with the existing deployment because changing the JWT secret expires saved sessions.
+
+Deployment must retain the existing Atlas database and records. Seed scripts, resets, and production write tests are not part of deployment.
 
 ## Author
 
-Parkhi Kumari - B.Tech Computer Science and Engineering, AI & Data Science.
+Parkhi Kumari — B.Tech Computer Science and Engineering, AI & Data Science.
