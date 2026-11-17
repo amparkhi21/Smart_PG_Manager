@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowLeft, CalendarCheck, Clock, LogOut, Pencil, Trash2, UserCheck, UserMinus, UserX, Zap } from 'lucide-react';
+import { ArrowLeft, CalendarCheck, Clock, Download, LogOut, Pencil, Trash2, UserCheck, UserMinus, UserX, Zap } from 'lucide-react';
 import api from '../api/client.js';
 import useFetch from '../hooks/useFetch.js';
 import StatCard from '../components/ui/StatCard.jsx';
@@ -13,6 +13,8 @@ import ErrorState from '../components/ui/ErrorState.jsx';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import ResidentFormModal from '../components/residents/ResidentFormModal.jsx';
 import { currentMonth, formatCurrency, formatDate, formatMonth, getErrorMessage } from '../utils/format.js';
+import { useAuth } from '../context/AuthContext.jsx';
+import { downloadPaymentReceipt } from '../utils/pdf.js';
 
 const Info = ({ label, children }) => (
   <div className="min-w-0">
@@ -28,6 +30,7 @@ const BackLink = () => (
 );
 
 export default function ResidentProfile() {
+  const { owner } = useAuth();
   const { id } = useParams();
   const navigate = useNavigate();
   const [month, setMonth] = useState(currentMonth());
@@ -66,7 +69,7 @@ export default function ResidentProfile() {
   const { resident, rentRecords, rentPending, electricityBills, attendance } = data;
   const active = resident.status === 'Active';
   const payments = rentRecords
-    .flatMap((r) => r.payments.map((p) => ({ ...p, month: r.month })))
+    .flatMap((r) => r.payments.map((p) => ({ ...p, month: r.month, rentRecord: r })))
     .sort((a, b) => new Date(b.paidOn) - new Date(a.paidOn));
 
   const markLeft = async () => {
@@ -178,12 +181,28 @@ export default function ResidentProfile() {
           ) : (
             <ul className="divide-y divide-slate-100">
               {payments.map((p) => (
-                <li key={p._id} className="flex items-center justify-between gap-3 py-3">
+                <li key={p._id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                   <div className="min-w-0">
                     <p className="font-semibold text-slate-800">{formatDate(p.paidOn)}</p>
                     <p className="truncate text-xs text-slate-500">{p.method} · Rent for {formatMonth(p.month)}{p.note ? ` · ${p.note}` : ''}</p>
                   </div>
-                  <span className="shrink-0 font-bold text-emerald-600">+{formatCurrency(p.amount)}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="shrink-0 font-bold text-emerald-600">+{formatCurrency(p.amount)}</span>
+                    {p._id && (
+                      <button
+                        className="btn-secondary min-h-9 px-2.5"
+                        onClick={async () => {
+                          try {
+                            await downloadPaymentReceipt('Rent', p.rentRecord, p, owner);
+                          } catch (error) {
+                            toast.error(error.message || 'Could not create receipt');
+                          }
+                        }}
+                      >
+                        <Download size={15} /> Receipt
+                      </button>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>

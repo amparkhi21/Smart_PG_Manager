@@ -24,6 +24,7 @@ export const dateIn = (loc, field = 'date', { optional = false } = {}) => {
 };
 
 export const paymentRules = [
+  body('requestId').optional().isUUID().withMessage('Invalid payment request ID'),
   body('amount').isFloat({ min: 0.01 }).withMessage('Amount must be greater than 0').toFloat(),
   body('method').optional().isIn(PAYMENT_METHODS).withMessage(`Method must be one of: ${PAYMENT_METHODS.join(', ')}`),
   body('paidOn')

@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, DoorOpen, Users, CalendarCheck, IndianRupee, Zap, History, MessageCircle, Settings,
+  LayoutDashboard, DoorOpen, Users, CalendarCheck, IndianRupee, Zap, History, MessageCircle, Settings, ChartNoAxesCombined,
 } from 'lucide-react';
 
 export const NAV = [
@@ -10,6 +10,7 @@ export const NAV = [
   { to: '/rent', label: 'Rent Management', short: 'Rent', icon: IndianRupee },
   { to: '/electricity', label: 'Electricity Bills', short: 'Electricity', icon: Zap },
   { to: '/payments', label: 'Payment History', short: 'Payments', icon: History },
+  { to: '/reports', label: 'Reports', short: 'Reports', icon: ChartNoAxesCombined },
   { to: '/reminders', label: 'Reminders', short: 'Reminders', icon: MessageCircle },
   { to: '/settings', label: 'Settings', short: 'Settings', icon: Settings },
 ];

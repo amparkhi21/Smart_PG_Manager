@@ -15,10 +15,22 @@ const ownerSchema = new mongoose.Schema(
     password: { type: String, required: true, minlength: 8, select: false },
     phone: { type: String, trim: true },
     pgName: { type: String, required: [true, 'PG name is required'], trim: true, maxlength: 100 },
+    address: { type: String, trim: true, maxlength: 300 },
     timezone: { type: String, default: 'Asia/Kolkata' },
     currency: { type: String, default: '₹' },
     defaultElectricityRate: { type: Number, default: 8, min: 0 },
     rentDueDay: { type: Number, default: 5, min: 1, max: 28 },
+    reminderSettings: {
+      templates: {
+        pendingRent: { type: String, default: '' },
+        overdueRent: { type: String, default: '' },
+        pendingElectricity: { type: String, default: '' },
+        overdueElectricity: { type: String, default: '' },
+      },
+      preferredTiming: { type: String, enum: ['Anytime', 'Morning', 'Afternoon', 'Evening'], default: 'Anytime' },
+      duplicateWarningHours: { type: Number, min: 1, max: 720, default: 24 },
+      suggestionsEnabled: { type: Boolean, default: true },
+    },
     isDemo: { type: Boolean, default: false },
   },
   { timestamps: true }

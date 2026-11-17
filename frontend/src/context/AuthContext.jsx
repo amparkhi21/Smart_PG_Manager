@@ -33,6 +33,10 @@ export function AuthProvider({ children }) {
     setOwner(o);
   };
 
+  const updateOwner = useCallback((nextOwner) => {
+    setOwner(nextOwner);
+  }, []);
+
   const login = useCallback(async (email, password) => {
     const res = await api.post('/auth/login', { email, password });
     saveSession(res.data.data);
@@ -48,7 +52,7 @@ export function AuthProvider({ children }) {
     setOwner(null);
   }, []);
 
-  const value = useMemo(() => ({ owner, loading, login, register, logout }), [owner, loading, login, register, logout]);
+  const value = useMemo(() => ({ owner, loading, login, register, logout, updateOwner }), [owner, loading, login, register, logout, updateOwner]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

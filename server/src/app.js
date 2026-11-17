@@ -10,6 +10,9 @@ import attendanceRoutes from './routes/attendanceRoutes.js';
 import rentRoutes from './routes/rentRoutes.js';
 import electricityRoutes from './routes/electricityRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
+import settingsRoutes from './routes/settingsRoutes.js';
+import remindersRoutes from './routes/remindersRoutes.js';
+import reportsRoutes from './routes/reportsRoutes.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
@@ -40,6 +43,9 @@ app.use('/api/residents', residentRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/rent', rentRoutes);
 app.use('/api/electricity', electricityRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/reminders', remindersRoutes);
+app.use('/api/reports', reportsRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

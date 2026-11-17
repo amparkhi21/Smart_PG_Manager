@@ -48,7 +48,7 @@ export const markAttendance = asyncHandler(async (req, res) => {
 
   const ops = [...latest.values()].map((r) => ({
     updateOne: {
-      filter: { resident: r.resident, date },
+      filter: { owner: ownerId, resident: r.resident, date },
       update: { $set: { owner: ownerId, room: roomOf.get(String(r.resident)), status: r.status, note: r.note || '' } },
       upsert: true,
     },

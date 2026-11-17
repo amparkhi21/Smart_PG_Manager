@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import ApiError from './ApiError.js';
 
 export const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
@@ -20,13 +21,40 @@ export const refreshOverdue = (Model, ownerId) =>
     { $set: { status: 'Overdue' } }
   );
 
-// The ONLY way payments are added: push a new entry. Existing entries are never edited or removed.
-// The model's pre-validate hook then recalculates amountPaid, balance and status.
-export function appendPayment(doc, { amount, method, paidOn, note }) {
+// A conditional pipeline update makes balance validation and installment append atomic.
+export function appendPaymentAtomically(Model, ownerId, recordId, { amount, method, paidOn, note, requestId }) {
   const value = round2(amount);
-  if (value > doc.balance) {
-    throw new ApiError(400, `Payment of ₹${value} is more than the pending balance of ₹${doc.balance}`);
-  }
-  if (doc.balance <= 0) throw new ApiError(409, 'This bill is already fully paid');
-  doc.payments.push({ amount: value, method: method || 'Cash', paidOn: paidOn || new Date(), note });
+  const payment = {
+    _id: new mongoose.Types.ObjectId(),
+    amount: value,
+    method: method || 'Cash',
+    paidOn: paidOn ? new Date(paidOn) : new Date(),
+  };
+  if (note) payment.note = note;
+  if (requestId) payment.requestId = requestId;
+  const now = new Date();
+
+  return Model.findOneAndUpdate(
+    {
+      _id: recordId,
+      owner: ownerId,
+      balance: { $gte: value, $gt: 0 },
+      ...(requestId ? { 'payments.requestId': { $ne: requestId } } : {}),
+    },
+    [{
+      $set: {
+        payments: { $concatArrays: [{ $ifNull: ['$payments', []] }, { $literal: [payment] }] },
+        amountPaid: { $round: [{ $add: [{ $ifNull: ['$amountPaid', 0] }, value] }, 2] },
+        balance: { $round: [{ $subtract: ['$balance', value] }, 2] },
+        status: {
+          $cond: [
+            { $lte: [{ $subtract: ['$balance', value] }, 0] },
+            'Paid',
+            { $cond: [{ $lt: ['$dueDate', now] }, 'Overdue', 'Partially Paid'] },
+          ],
+        },
+      },
+    }],
+    { new: true }
+  );
 }

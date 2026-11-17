@@ -1,8 +1,9 @@
 import RentRecord from '../models/RentRecord.js';
 import Resident from '../models/Resident.js';
+import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { findOwned } from '../utils/ownership.js';
-import { refreshOverdue, appendPayment, round2 } from '../utils/billing.js';
+import { refreshOverdue, appendPaymentAtomically, round2 } from '../utils/billing.js';
 import { currentMonthIST, dueDateFor, monthEndIST } from '../utils/dates.js';
 
 const POPULATE = [
@@ -65,9 +66,16 @@ export const getRent = asyncHandler(async (req, res) => {
 
 // Append-only: there is intentionally no endpoint to edit or delete a payment.
 export const addRentPayment = asyncHandler(async (req, res) => {
-  const record = await findOwned(RentRecord, req.params.id, req);
-  appendPayment(record, req.body);
-  await record.save();
+  const record = await appendPaymentAtomically(RentRecord, req.owner._id, req.params.id, req.body);
+  if (!record) {
+    const current = await findOwned(RentRecord, req.params.id, req);
+    if (req.body.requestId && current.payments.some((payment) => payment.requestId === req.body.requestId)) {
+      await current.populate(POPULATE);
+      return res.json({ success: true, message: 'This payment was already recorded', data: current });
+    }
+    if (current.balance <= 0) throw new ApiError(409, 'This bill is already fully paid');
+    throw new ApiError(400, `Payment of ₹${round2(req.body.amount)} is more than the pending balance of ₹${current.balance}`);
+  }
   await record.populate(POPULATE);
   res.status(201).json({
     success: true,

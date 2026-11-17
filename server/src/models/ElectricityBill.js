@@ -6,6 +6,7 @@ const paymentSchema = new mongoose.Schema({
   paidOn: { type: Date, default: Date.now },
   method: { type: String, enum: PAYMENT_METHODS, default: 'Cash' },
   note: { type: String, trim: true },
+  requestId: { type: String, trim: true, maxlength: 36 },
 });
 
 const electricityBillSchema = new mongoose.Schema(
