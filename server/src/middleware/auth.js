@@ -12,7 +12,10 @@ export const protect = asyncHandler(async (req, res, next) => {
 
   let decoded;
   try {
-    decoded = jwt.verify(token, process.env.JWT_SECRET);
+    decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    if (!decoded || typeof decoded !== 'object' || !/^[a-f\d]{24}$/i.test(decoded.id || '')) {
+      throw new Error('Invalid token subject');
+    }
   } catch {
     throw new ApiError(401, 'Your session has expired. Please log in again');
   }
