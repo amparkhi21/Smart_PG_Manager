@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
-const files = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean);
+const repositoryRoot = fileURLToPath(new URL('../../', import.meta.url));
+const files = execFileSync('git', ['ls-files', '-z'], { cwd: repositoryRoot, encoding: 'utf8' }).split('\0').filter(Boolean);
 const unsafe = files.filter((file) => {
   if (/(^|\/)\.env\.example$/.test(file)) return false;
   return /(^|\/)(\.env($|\.)|node_modules\/|dist\/|coverage\/|test-results\/|playwright-report\/|backups?\/|data-exports\/)|\.(pem|key|p12|dump|log|bak|backup|old|orig|bson|archive|tmp)$/i.test(file);

@@ -32,6 +32,8 @@ A responsive application for paying guest (PG) property owners to manage rooms, 
 
 Use **Node.js 24** and npm. In Windows PowerShell, use `npm.cmd` if execution policy blocks `npm.ps1`.
 
+Both [frontend/package.json](frontend/package.json) and [server/package.json](server/package.json) declare `engines.node` as `24.x`, matching their lockfiles. A root `.node-version` file is not required. An existing Render `NODE_VERSION` setting overrides the package declaration; keep it at `24` if configured.
+
 Install the locked dependencies from the repository root:
 
 ```sh
@@ -69,7 +71,7 @@ npm run build --prefix frontend
 npm run test:build --prefix frontend
 npm audit --audit-level=moderate --prefix server
 npm audit --audit-level=moderate --prefix frontend
-node scripts/check-repository.mjs
+npm run check:repository --prefix server
 ```
 
 The production output is `frontend/dist`. `npm run preview --prefix frontend` serves that build locally. To target a different backend, set `VITE_API_BASE_URL` to its public HTTPS URL ending in `/api` before building. Missing or loopback production values resolve to `https://smart-pg-manager-backend.onrender.com/api`; malformed URLs are rejected.
@@ -93,7 +95,7 @@ frontend/
     utils/              Formatting, dates, receipts, reports, and reminders
   vercel.json           Vercel build settings, headers, and SPA routing
 server/
-  scripts/              Read-only database connectivity check
+  scripts/              Read-only database and repository hygiene checks
   src/
     config/             Environment validation and database connection
     controllers/        Request handlers
@@ -103,7 +105,6 @@ server/
     seed/               Optional development demo data
     utils/              Shared billing, ownership, and date helpers
   test/                 Backend automated tests
-scripts/                Repository hygiene checks
 render.yaml             Render service blueprint
 ```
 

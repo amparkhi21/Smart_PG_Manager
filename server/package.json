@@ -10,7 +10,8 @@
     "start": "node src/server.js",
     "seed": "node src/seed/seed.js",
     "test": "node --test",
-    "check:db": "node scripts/check-db.js"
+    "check:db": "node scripts/check-db.js",
+    "check:repository": "node scripts/check-repository.mjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
