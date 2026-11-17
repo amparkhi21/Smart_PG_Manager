@@ -1,5 +1,5 @@
 ﻿import { useMemo, useState } from 'react';
-import { Download, History, IndianRupee, SearchX, Users, Zap } from 'lucide-react';
+import { Download, History, IndianRupee, SearchX, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
