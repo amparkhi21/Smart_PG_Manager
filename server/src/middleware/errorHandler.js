@@ -1,10 +1,12 @@
 import ApiError from '../utils/ApiError.js';
 
 export const notFound = (req, res, next) =>
-  next(new ApiError(404, `Route not found: ${req.method} ${req.originalUrl}`));
+  next(new ApiError(404, 'Route not found'));
 
 export const errorHandler = (err, req, res, next) => {
-  let status = err.statusCode || 500;
+  if (res.headersSent) return next(err);
+  let status = err.statusCode || err.status || 500;
+  if (!Number.isInteger(status) || status < 400 || status > 599) status = 500;
   let message = err.message || 'Server error';
   let errors = err.errors;
 
@@ -21,9 +23,14 @@ export const errorHandler = (err, req, res, next) => {
   }
 
   const isProd = process.env.NODE_ENV === 'production';
-  if (status === 500) {
-    console.error(err);
+  if (status >= 500) {
+    console.error('API request failed', { method: req.method, path: req.path, status });
     if (isProd) message = 'Something went wrong. Please try again.';
+    if (isProd) errors = undefined;
+  } else if (err.type === 'entity.parse.failed') {
+    message = 'Invalid JSON request body';
+  } else if (err.type === 'entity.too.large') {
+    message = 'Request body is too large';
   }
 
   res.status(status).json({

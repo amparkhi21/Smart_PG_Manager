@@ -14,7 +14,9 @@ export function AuthProvider({ children }) {
     api
       .get('/auth/me')
       .then((res) => setOwner(res.data.data.owner))
-      .catch(() => localStorage.removeItem(TOKEN_KEY))
+      // A network error/cold start must not erase an otherwise valid saved session.
+      // The API interceptor clears the token only for an actual 401 response.
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
