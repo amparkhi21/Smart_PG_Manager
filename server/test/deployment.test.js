@@ -28,14 +28,31 @@ test('production configuration accepts cloud settings and normalizes exact CORS 
   assert.deepEqual(clientOrigins({ NODE_ENV: 'development' }), ['http://localhost:5173']);
 });
 
-test('production configuration rejects missing secrets, placeholders, localhost, and unsafe origins', () => {
+test('production configuration accepts an explicitly configured Capacitor Android origin alongside website origins', () => {
+  const env = productionEnv();
+  env.CLIENT_URL += ', https://localhost, https://localhost/';
+  assert.deepEqual(validateEnv(env), { port: 10000 });
+  assert.deepEqual(clientOrigins(env), [
+    'https://smart-pg-manager.vercel.app', 'https://preview.unit.test', 'https://localhost',
+  ]);
+  assert.deepEqual(clientOrigins({ NODE_ENV: 'production', CLIENT_URL: 'https://localhost' }), ['https://localhost']);
+});
+
+test('production configuration rejects missing secrets, placeholders, and unsafe origins', () => {
   const invalid = [
     { MONGO_URI: '' }, { MONGO_URI: 'mongodb://127.0.0.1:27017/pg' },
     { MONGO_URI: 'mongodb+srv://<user>:<password>@<cluster>/pg' },
     { JWT_SECRET: '' }, { JWT_SECRET: 'short' },
     { JWT_SECRET: 'replace_me_with_a_long_random_secret' },
     { CLIENT_URL: '' }, { CLIENT_URL: '*' }, { CLIENT_URL: 'https://*.vercel.app' },
-    { CLIENT_URL: 'http://pg-manager.vercel.app' }, { CLIENT_URL: 'https://localhost' },
+    { CLIENT_URL: 'http://pg-manager.vercel.app' }, { CLIENT_URL: 'http://localhost' },
+    { CLIENT_URL: 'http://localhost:5173' }, { CLIENT_URL: 'https://localhost:5173' },
+    { CLIENT_URL: 'https://127.0.0.1' }, { CLIENT_URL: 'https://127.0.0.2' },
+    { CLIENT_URL: 'https://[::1]' }, { CLIENT_URL: 'https://0.0.0.0' },
+    { CLIENT_URL: 'https://app.localhost' }, { CLIENT_URL: 'capacitor://localhost' },
+    { CLIENT_URL: 'https://localhost/path' }, { CLIENT_URL: 'https://localhost?debug=1' },
+    { CLIENT_URL: 'https://localhost#fragment' }, { CLIENT_URL: 'https://user:password@localhost' },
+    { CLIENT_URL: 'https://localhost, http://localhost:5173' },
     { CLIENT_URL: 'https://pg-manager.vercel.app/path' },
     { CLIENT_URL: 'https://user:password@pg-manager.vercel.app' },
     { PORT: 'NaN' }, { PORT: '0' }, { PORT: '65536' },
@@ -84,6 +101,64 @@ test('local development CORS allows the Vite origin and login preflight', async 
   assert.match(response.headers.get('access-control-allow-methods'), /POST/);
 });
 
+test('Capacitor and website CORS allow login and bearer preflights while protected routes still require authentication', async (t) => {
+  const env = productionEnv();
+  env.CLIENT_URL += ', https://localhost';
+  const base = await serve(t, createApp(env));
+  for (const origin of clientOrigins(env)) {
+    for (const [path, method] of [['/api/auth/login', 'POST'], ['/api/settings', 'PATCH']]) {
+      const preflight = await fetch(`${base}${path}`, {
+        method: 'OPTIONS', headers: {
+          Origin: origin, 'Access-Control-Request-Method': method,
+          'Access-Control-Request-Headers': 'authorization,content-type',
+        },
+      });
+      assert.equal(preflight.status, 204, `${origin} ${method} preflight`);
+      assert.equal(preflight.headers.get('access-control-allow-origin'), origin);
+      assert.equal(preflight.headers.get('access-control-allow-headers'), 'Authorization,Content-Type');
+      assert.ok(preflight.headers.get('access-control-allow-methods').split(',').includes(method));
+      assert.match(preflight.headers.get('vary'), /Origin/);
+      assert.equal(preflight.headers.get('access-control-allow-credentials'), null);
+    }
+    const health = await fetch(`${base}/api/health`, { headers: { Origin: origin } });
+    assert.equal(health.status, 200);
+    assert.equal(health.headers.get('access-control-allow-origin'), origin);
+    const protectedResponse = await fetch(`${base}/api/settings`, { headers: { Origin: origin } });
+    assert.equal(protectedResponse.status, 401);
+    assert.equal(protectedResponse.headers.get('access-control-allow-origin'), origin);
+  }
+  assert.equal((await fetch(`${base}/api/health`)).status, 200);
+});
+
+test('Capacitor CORS remains opt-in and rejects unconfigured origins and localhost lookalikes', async (t) => {
+  const websiteOnly = await serve(t, createApp(productionEnv()));
+  const env = productionEnv();
+  env.CLIENT_URL += ', https://localhost';
+  const withAndroid = await serve(t, createApp(env));
+  const deniedOrigins = [
+    'http://localhost', 'http://localhost:5173', 'https://localhost:5173',
+    'https://127.0.0.1', 'https://[::1]', 'https://0.0.0.0', 'https://app.localhost',
+    'https://localhost.evil.unit.test', 'https://smart-pg-manager.vercel.app.evil.unit.test',
+    'https://untrusted.unit.test', 'capacitor://localhost', 'null',
+  ];
+  for (const [base, origins] of [[websiteOnly, ['https://localhost']], [withAndroid, deniedOrigins]]) {
+    for (const origin of origins) {
+      for (const method of ['GET', 'OPTIONS']) {
+        const response = await fetch(`${base}/api/health`, {
+          method, headers: {
+            Origin: origin, 'Access-Control-Request-Method': 'GET',
+            'Access-Control-Request-Headers': 'authorization,content-type',
+          },
+        });
+        assert.equal(response.status, 403, `${method} ${origin}`);
+        assert.equal(response.headers.get('access-control-allow-origin'), null);
+        assert.equal(response.headers.get('access-control-allow-headers'), null);
+        assert.equal((await response.json()).message, 'Origin is not allowed');
+      }
+    }
+  }
+});
+
 test('health stays available while readiness reflects database ping success or failure', async (t) => {
   const base = await serve(t, createApp(productionEnv()));
   assert.equal((await fetch(`${base}/api/health`)).status, 200);
@@ -115,7 +190,9 @@ test('JWT sessions accept a valid HS256 token and reject expired, malformed, or 
   });
   let lookups = 0;
   t.mock.method(Owner, 'findById', async (id) => { lookups += 1; return { _id: id, name: 'Test Owner' }; });
-  const base = await serve(t, createApp(productionEnv()));
+  const env = productionEnv();
+  env.CLIENT_URL += ', https://localhost';
+  const base = await serve(t, createApp(env));
   const id = new mongoose.Types.ObjectId().toString();
   const invalid = [
     'malformed',
@@ -124,17 +201,24 @@ test('JWT sessions accept a valid HS256 token and reject expired, malformed, or 
     jwt.sign({ id }, secret, { algorithm: 'HS384', expiresIn: '1h' }),
     jwt.sign({ id: 'invalid-object-id' }, secret, { expiresIn: '1h' }),
   ];
-  for (const token of invalid) {
-    const response = await fetch(`${base}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
-    assert.equal(response.status, 401);
+  const origins = ['https://smart-pg-manager.vercel.app', 'https://localhost'];
+  for (const origin of origins) {
+    for (const token of invalid) {
+      const response = await fetch(`${base}/api/auth/me`, { headers: { Origin: origin, Authorization: `Bearer ${token}` } });
+      assert.equal(response.status, 401);
+      assert.equal(response.headers.get('access-control-allow-origin'), origin);
+    }
   }
   assert.equal(lookups, 0);
-  const response = await fetch(`${base}/api/auth/me`, {
-    headers: { Origin: 'https://smart-pg-manager.vercel.app', Authorization: `Bearer ${jwt.sign({ id }, secret, { expiresIn: '1h' })}` },
-  });
-  assert.equal(response.status, 200);
-  assert.equal((await response.json()).data.owner.id, id);
-  assert.equal(lookups, 1);
+  for (const origin of origins) {
+    const response = await fetch(`${base}/api/auth/me`, {
+      headers: { Origin: origin, Authorization: `Bearer ${jwt.sign({ id }, secret, { expiresIn: '1h' })}` },
+    });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('access-control-allow-origin'), origin);
+    assert.equal((await response.json()).data.owner.id, id);
+  }
+  assert.equal(lookups, origins.length);
 });
 
 test('production errors omit private details and malformed JSON returns 400', async (t) => {
