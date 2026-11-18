@@ -10,9 +10,12 @@ export function clientOrigins(env = process.env) {
   return [...new Set(value.split(',').map((entry) => {
     try {
       const url = new URL(entry.trim());
+      // Capacitor Android is allowed only when this exact origin is configured.
+      const isCapacitorAndroidOrigin = url.origin === 'https://localhost';
       if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password ||
           url.pathname !== '/' || url.search || url.hash || url.hostname.includes('*') ||
-          (production && (url.protocol !== 'https:' || isLocalHost(url.hostname)))) throw new Error();
+          (production && (url.protocol !== 'https:' ||
+            (isLocalHost(url.hostname) && !isCapacitorAndroidOrigin)))) throw new Error();
       return url.origin;
     } catch {
       throw new Error('CLIENT_URL must contain exact frontend origins (HTTPS in production), separated by commas');
