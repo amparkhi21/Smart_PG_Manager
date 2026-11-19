@@ -28,6 +28,11 @@ A responsive application for paying guest (PG) property owners to manage rooms, 
 | Charts and documents | Recharts, jsPDF |
 | Hosting | Vercel frontend, Render API |
 
+## 🌐 Live Website & Android App
+
+- [Live Website](https://smart-pg-manager.vercel.app)
+- [Download Android App](https://github.com/amparkhi21/Smart_PG_Manager/releases/latest)
+
 ## Getting started
 
 Use **Node.js 24** and npm. In Windows PowerShell, use `npm.cmd` if execution policy blocks `npm.ps1`.
