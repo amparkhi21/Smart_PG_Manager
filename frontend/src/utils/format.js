@@ -22,7 +22,14 @@ export const currentMonth = () => new Intl.DateTimeFormat('en-CA', { timeZone: T
 
 // Turns any Axios error into a friendly message for toasts and forms
 export function getErrorMessage(err) {
-  if (!err?.response) return 'Cannot reach the server. Check your internet or make sure the backend is running.';
+  if (!err?.response) {
+    const write = ['post', 'put', 'patch', 'delete'].includes(err?.config?.method?.toLowerCase());
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    const message = offline ? 'You are offline. Reconnect to the internet, then try again.' : err?.code === 'ECONNABORTED'
+      ? 'The server took too long to respond. It may be waking up.'
+      : 'Cannot reach the server. Check your connection and try again.';
+    return write ? `${message} Before submitting again, refresh and check whether your change was saved.` : message;
+  }
   const { message, errors } = err.response.data || {};
   if (Array.isArray(errors) && errors.length) return errors.map((e) => e.message).join('. ');
   return message || 'Something went wrong. Please try again.';

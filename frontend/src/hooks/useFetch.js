@@ -26,6 +26,7 @@ export default function useFetch(fetcher, deps = []) {
 
   useEffect(() => {
     load();
+    return () => { latest.current += 1; };
   }, [load]);
 
   return { data, loading, error, reload: load };

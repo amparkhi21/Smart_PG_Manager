@@ -7,6 +7,7 @@ import ConfirmDialog from '../ui/ConfirmDialog.jsx';
 import { Field, Select, Textarea } from '../ui/FormControls.jsx';
 import { formatCurrency, formatMonth, getErrorMessage } from '../../utils/format.js';
 import { createReminderMessage, createWhatsAppUrl } from '../../utils/reminders.js';
+import { prepareExternalLink, copyText } from '../../native/external.js';
 
 export default function ReminderPreviewModal({ item, owner, initialActivity, onClose, onActivitySaved }) {
   const fixedRecipient = item.sourceType === 'Rent' ? item.residents[0] : null;
@@ -55,22 +56,23 @@ export default function ReminderPreviewModal({ item, owner, initialActivity, onC
       return;
     }
 
-    const popup = window.open('about:blank', '_blank');
-    if (!popup) {
-      setFormError('The browser blocked the new tab. Allow pop-ups to open WhatsApp, then try again.');
+    let external;
+    try {
+      external = prepareExternalLink(url);
+    } catch (err) {
+      setFormError(err.message);
       return;
     }
-    popup.opener = null;
     setBusy(true);
     setFormError('');
     try {
       const { data } = await api.patch(`/reminders/activity/${activity._id}`, { action: 'opened' });
       setActivity(data.data);
       onActivitySaved?.(item, data.data);
-      popup.location.href = url;
+      await external.open();
       toast.success('WhatsApp opened. The reminder has not been sent or delivered.');
     } catch (err) {
-      popup.close();
+      external.close();
       setFormError(`Could not complete the WhatsApp open action: ${getErrorMessage(err)}`);
     } finally {
       setBusy(false);
@@ -79,7 +81,7 @@ export default function ReminderPreviewModal({ item, owner, initialActivity, onC
 
   const copyMessage = async () => {
     try {
-      await navigator.clipboard.writeText(message);
+      await copyText(message);
       toast.success('Reminder message copied');
     } catch {
       setFormError('Could not access the clipboard. Select and copy the message manually.');

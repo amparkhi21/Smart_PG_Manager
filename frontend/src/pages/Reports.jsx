@@ -52,9 +52,9 @@ export default function Reports() {
     [data, month]
   );
 
-  const exportCsv = () => {
+  const exportCsv = async () => {
     try {
-      downloadCsv(exportType, data, month);
+      await downloadCsv(exportType, data, month);
     } catch (exportError) {
       toast.error(exportError.message || 'Could not export CSV');
     }

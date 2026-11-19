@@ -9,7 +9,7 @@ export default function IconButton({ icon: Icon, label, tone = 'default', classN
       type="button"
       aria-label={label}
       title={label}
-      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 transition disabled:cursor-not-allowed disabled:opacity-40 ${TONES[tone]} ${className}`}
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 transition disabled:cursor-not-allowed disabled:opacity-40 ${TONES[tone]} ${className}`}
       {...props}
     >
       <Icon size={18} />

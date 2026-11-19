@@ -39,3 +39,19 @@ data-exports/
 *.p12
 .codex/
 .agents/
+
+# Android generated release files
+frontend/android/app/release/
+*.apk
+*.aab
+
+# Android signing credentials
+*.jks
+*.keystore
+**/key.properties
+**/keystore.properties
+
+# Android Studio local files
+**/.idea/
+**/.gradle/
+**/local.properties
