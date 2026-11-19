@@ -67,7 +67,7 @@ assert.match(reports.createCsv('residents', data, data.month), /'=formula-test/)
 let clicked = false;
 const anchor = { click() { clicked = true; }, remove() {} };
 globalThis.document = { createElement: () => anchor, body: { appendChild() {} } };
-reports.downloadCsv('residents', data, data.month);
+await reports.downloadCsv('residents', data, data.month);
 assert.ok(clicked);
 assert.equal(anchor.download, 'residents-2026-11.csv');
 assert.match(anchor.href, /^blob:/);

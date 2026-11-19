@@ -1,4 +1,5 @@
-import { Building2, IndianRupee, Zap, MessageCircle } from 'lucide-react';
+import { IndianRupee, Zap, MessageCircle } from 'lucide-react';
+import BrandMark from '../components/BrandMark.jsx';
 
 const POINTS = [
   { icon: IndianRupee, text: 'Track rent and partial payments' },
@@ -13,9 +14,7 @@ export default function AuthLayout({ title, subtitle, children }) {
         <div className="absolute -right-24 -top-24 h-80 w-80 rounded-full bg-orange-500/20" />
         <div className="absolute -bottom-32 -left-16 h-96 w-96 rounded-full bg-teal-500/10" />
         <div className="relative flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-500">
-            <Building2 size={24} />
-          </div>
+          <BrandMark />
           <p className="text-xl font-extrabold">Smart PG Manager</p>
         </div>
         <div className="relative">
@@ -38,12 +37,10 @@ export default function AuthLayout({ title, subtitle, children }) {
         <p className="relative text-sm text-navy-200">No more registers and notebooks.</p>
       </div>
 
-      <div className="flex items-center justify-center px-5 py-10 pt-[calc(2.5rem+env(safe-area-inset-top))]">
+      <div className="auth-content flex min-w-0 items-center justify-center px-5 py-10">
         <div className="w-full max-w-md animate-fade-in">
           <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-navy-900 text-white">
-              <Building2 size={22} />
-            </div>
+            <BrandMark />
             <p className="text-lg font-extrabold text-navy-900">Smart PG Manager</p>
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900">{title}</h1>

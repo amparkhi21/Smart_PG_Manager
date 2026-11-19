@@ -206,7 +206,7 @@ export default function DailyAttendance({ rooms, visible }) {
 
       {/* Save bar */}
       {visible && dirtyCount > 0 && (
-        <div className="fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 lg:inset-x-auto lg:bottom-6 lg:right-8 lg:w-[30rem]">
+        <div className="fixed inset-x-3 bottom-[calc(4.75rem+var(--app-safe-bottom))] z-30 lg:inset-x-auto lg:bottom-6 lg:right-8 lg:w-[30rem]">
           <div className="flex items-center gap-2 rounded-2xl bg-navy-900 p-3 text-white shadow-xl">
             <p className="min-w-0 flex-1 text-sm font-semibold">{plural(dirtyCount, 'unsaved change')}</p>
             <button
