@@ -7,9 +7,9 @@ export default function AppLayout() {
   return (
     <div className="min-h-dvh lg:pl-64">
       <Sidebar />
-      <div className="flex min-h-dvh flex-col">
+      <div className="flex min-h-dvh min-w-0 flex-col">
         <Header />
-        <main className="mx-auto w-full max-w-7xl flex-1 animate-fade-in px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:pb-10">
+        <main className="app-content mx-auto min-w-0 w-full max-w-7xl flex-1 animate-fade-in px-4 py-5 sm:px-6 lg:px-8">
           <Outlet />
         </main>
       </div>

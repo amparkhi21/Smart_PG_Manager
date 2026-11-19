@@ -1,4 +1,5 @@
 import { formatMonth, round2 } from './format.js';
+import { exportFile } from '../native/files.js';
 
 const formatMoney = (value) => `INR ${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(Number(value) || 0)}`;
 const formatIndiaDate = (value, includeTime = false) => {
@@ -97,7 +98,7 @@ export async function createPaymentReceipt(type, record, payment, owner = {}) {
 
 export async function downloadPaymentReceipt(type, record, payment, owner) {
   const doc = await createPaymentReceipt(type, record, payment, owner);
-  doc.save(`${getReceiptNumber(type, payment)}.pdf`);
+  await exportFile(doc.output('blob'), `${getReceiptNumber(type, payment)}.pdf`, 'application/pdf');
 }
 
 export async function createMonthlyReportPdf({ data, report, generatedAt = new Date() }) {
@@ -174,5 +175,5 @@ export async function createMonthlyReportPdf({ data, report, generatedAt = new D
 
 export async function downloadMonthlyReportPdf(args) {
   const doc = await createMonthlyReportPdf(args);
-  doc.save(`financial-report-${args.report.month}.pdf`);
+  await exportFile(doc.output('blob'), `financial-report-${args.report.month}.pdf`, 'application/pdf');
 }

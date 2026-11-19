@@ -1,4 +1,5 @@
 import { round2 } from './format.js';
+import { exportFile } from '../native/files.js';
 
 const monthInIndia = (date) => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -146,14 +147,7 @@ export function createCsv(kind, data, month) {
   return `\uFEFF${rowsForExport(kind, data, month).map((row) => row.map(csvCell).join(',')).join('\r\n')}`;
 }
 
-export function downloadCsv(kind, data, month) {
+export async function downloadCsv(kind, data, month) {
   const blob = new Blob([createCsv(kind, data, month)], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `${kind}-${month}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  await exportFile(blob, `${kind}-${month}.csv`, 'text/csv');
 }

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { MoreHorizontal, LogOut, X } from 'lucide-react';
+import { MoreHorizontal, LogOut } from 'lucide-react';
 import { NAV, MOBILE_PRIMARY } from '../utils/nav.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import Modal from './ui/Modal.jsx';
 
 export default function BottomNav() {
   const { logout } = useAuth();
@@ -12,7 +13,7 @@ export default function BottomNav() {
 
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
+      <nav aria-label="Main navigation" className="mobile-bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white lg:hidden">
         <ul className="mx-auto grid max-w-lg grid-cols-5">
           {primary.map(({ to, short, icon: Icon, end }) => (
             <li key={to}>
@@ -51,15 +52,7 @@ export default function BottomNav() {
       </nav>
 
       {moreOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-navy-950/50" onClick={() => setMoreOpen(false)} />
-          <div className="absolute inset-x-0 bottom-0 animate-fade-in rounded-t-3xl bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-bold text-slate-900">More</h2>
-              <button onClick={() => setMoreOpen(false)} className="rounded-full p-2 hover:bg-slate-100" aria-label="Close">
-                <X size={18} />
-              </button>
-            </div>
+        <Modal title="More" onClose={() => setMoreOpen(false)}>
             <div className="grid grid-cols-3 gap-3">
               {more.map(({ to, short, icon: Icon }) => (
                 <NavLink
@@ -80,8 +73,7 @@ export default function BottomNav() {
                 Log out
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </>
   );
