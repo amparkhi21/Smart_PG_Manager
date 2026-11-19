@@ -21,8 +21,8 @@ export default function StatCard({ icon: Icon, label, value, sub, tone = 'navy',
         </>
       ) : (
         <>
-          <p className="truncate text-2xl font-bold tracking-tight text-slate-900">{value}</p>
-          <p className="truncate text-sm font-medium text-slate-500">{label}</p>
+          <p className="stat-value break-words text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{value}</p>
+          <p className="text-sm font-medium text-slate-500">{label}</p>
           {sub && <p className="mt-1 truncate text-xs text-slate-400">{sub}</p>}
         </>
       )}

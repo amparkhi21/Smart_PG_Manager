@@ -32,7 +32,7 @@ export const Textarea = forwardRef(function Textarea({ invalid, className = '', 
 
 export const Select = forwardRef(function Select({ invalid, className = '', children, ...props }, ref) {
   return (
-    <div className="relative">
+    <div className="relative min-w-0">
       <select ref={ref} className={`input appearance-none pr-10 ${invalid ? INVALID : ''} ${className}`} {...props}>
         {children}
       </select>

@@ -1,11 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { Building2, ChevronDown, LogOut } from 'lucide-react';
+import { ChevronDown, LogOut } from 'lucide-react';
+import BrandMark from './BrandMark.jsx';
+import { registerBackHandler } from '../native/backNavigation.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Header() {
   const { owner, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+
+  useEffect(() => {
+    if (open) return registerBackHandler(() => setOpen(false));
+  }, [open]);
 
   // Close the profile menu when tapping outside it
   useEffect(() => {
@@ -23,12 +29,10 @@ export default function Header() {
   const initial = (owner?.name || '?').charAt(0).toUpperCase();
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/90 pt-[env(safe-area-inset-top)] backdrop-blur">
+    <header className="app-header sticky top-0 z-30 border-b border-slate-100 bg-white/90 backdrop-blur">
       <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-navy-900 text-white lg:hidden">
-            <Building2 size={18} />
-          </div>
+          <span className="lg:hidden"><BrandMark className="h-10 w-10" /></span>
           <div className="min-w-0">
             <p className="truncate font-bold text-slate-900">{owner?.pgName}</p>
             <p className="hidden text-xs text-slate-500 sm:block">Owner dashboard</p>
@@ -43,7 +47,7 @@ export default function Header() {
         <div className="relative shrink-0" ref={ref}>
           <button
             onClick={() => setOpen((o) => !o)}
-            className="flex items-center gap-2 rounded-xl p-1 pr-2 hover:bg-slate-50"
+            className="flex min-h-11 min-w-11 items-center gap-2 rounded-xl p-1 pr-2 hover:bg-slate-50"
             aria-label="Open profile menu"
           >
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-500 font-bold text-white">

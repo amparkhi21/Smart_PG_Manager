@@ -163,7 +163,7 @@ export default function PaymentHistory() {
         </div>
       ) : (
         <>
-          <div className="mb-5 grid grid-cols-4 gap-2 sm:gap-3">
+          <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <StatCard icon={IndianRupee} label="Collected" value={formatCurrency(totals.total)} tone="emerald" />
             <StatCard icon={IndianRupee} label="Rent" value={formatCurrency(totals.Rent)} tone="navy" />
             <StatCard icon={Zap} label="Electricity" value={formatCurrency(totals.Electricity)} tone="teal" />
