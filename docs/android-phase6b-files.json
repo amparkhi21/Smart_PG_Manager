@@ -1,0 +1,423 @@
+﻿{
+    "branch":  "mobile-app",
+    "backendHotfix":  "3657607",
+    "originalMobileBackup":  "tmp/phase6b-original/",
+    "originalPackageManifestsUnchanged":  true,
+    "changedFiles":  [
+                         {
+                             "path":  "frontend/android/.gitignore",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/build.gradle",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/androidTest/java/com/getcapacitor/myapp/ExampleInstrumentedTest.java",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/AndroidManifest.xml",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/java/com/smartpgmanager/app/MainActivity.java",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/java/com/smartpgmanager/app/SmartPgNativePlugin.java",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/drawable/ic_launcher_foreground.xml",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/drawable/ic_launcher_monochrome.xml",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/drawable-xxhdpi/splash_wordmark.png",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/mipmap-anydpi-v33/ic_launcher.xml",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/mipmap-anydpi-v33/ic_launcher_round.xml",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/mipmap-hdpi/ic_launcher.png",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/mipmap-mdpi/ic_launcher.png",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/values/colors.xml",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/values/ic_launcher_background.xml",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/values/styles.xml",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/values-v27/styles.xml",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/values-v31/styles.xml",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/xml/data_extraction_rules.xml",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/xml/file_paths.xml",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/capacitor.config.json",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/index.html",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/public/brand/smart-pg-icon.svg",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/scripts/generate-android-branding.ps1",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/scripts/verify-build.mjs",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/api/client.js",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/api/http.js",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/components/attendance/DailyAttendance.jsx",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/components/BottomNav.jsx",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/components/BrandMark.jsx",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/src/components/ConnectionNotice.jsx",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/src/components/Header.jsx",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/components/NativeRuntime.jsx",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/src/components/ProtectedRoute.jsx",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/components/reminders/ReminderPreviewModal.jsx",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/components/ui/FormControls.jsx",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/components/ui/IconButton.jsx",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/components/ui/Modal.jsx",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/components/ui/StatCard.jsx",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/context/AuthContext.jsx",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/hooks/useFetch.js",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/index.css",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/layouts/AppLayout.jsx",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/layouts/AuthLayout.jsx",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/main.jsx",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/native/backNavigation.js",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/src/native/external.js",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/src/native/files.js",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/src/native/mobile.test.js",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/src/native/platform.js",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/src/native/requestActivity.js",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/src/native/sessionStorage.js",
+                             "change":  "created"
+                         },
+                         {
+                             "path":  "frontend/src/pages/PaymentHistory.jsx",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/pages/Reports.jsx",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/utils/format.js",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/utils/pdf.js",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/src/utils/reports.js",
+                             "change":  "modified"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/drawable/ic_launcher_background.xml",
+                             "change":  "removed obsolete branding asset; original retained in backup"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/drawable/splash.png",
+                             "change":  "removed obsolete branding asset; original retained in backup"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/drawable-land-hdpi/splash.png",
+                             "change":  "removed obsolete branding asset; original retained in backup"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/drawable-land-mdpi/splash.png",
+                             "change":  "removed obsolete branding asset; original retained in backup"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/drawable-land-xhdpi/splash.png",
+                             "change":  "removed obsolete branding asset; original retained in backup"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/drawable-land-xxhdpi/splash.png",
+                             "change":  "removed obsolete branding asset; original retained in backup"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/drawable-land-xxxhdpi/splash.png",
+                             "change":  "removed obsolete branding asset; original retained in backup"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/drawable-port-hdpi/splash.png",
+                             "change":  "removed obsolete branding asset; original retained in backup"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/drawable-port-mdpi/splash.png",
+                             "change":  "removed obsolete branding asset; original retained in backup"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/drawable-port-xhdpi/splash.png",
+                             "change":  "removed obsolete branding asset; original retained in backup"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/drawable-port-xxhdpi/splash.png",
+                             "change":  "removed obsolete branding asset; original retained in backup"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/drawable-port-xxxhdpi/splash.png",
+                             "change":  "removed obsolete branding asset; original retained in backup"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml",
+                             "change":  "removed obsolete branding asset; original retained in backup"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png",
+                             "change":  "removed obsolete branding asset; original retained in backup"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png",
+                             "change":  "removed obsolete branding asset; original retained in backup"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png",
+                             "change":  "removed obsolete branding asset; original retained in backup"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png",
+                             "change":  "removed obsolete branding asset; original retained in backup"
+                         },
+                         {
+                             "path":  "frontend/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png",
+                             "change":  "removed obsolete branding asset; original retained in backup"
+                         }
+                     ],
+    "preservedPreexistingFiles":  [
+                                      "frontend/android/.idea/.gitignore",
+                                      "frontend/android/.idea/AndroidProjectSystem.xml",
+                                      "frontend/android/.idea/compiler.xml",
+                                      "frontend/android/.idea/deploymentTargetSelector.xml",
+                                      "frontend/android/.idea/migrations.xml",
+                                      "frontend/android/.idea/misc.xml",
+                                      "frontend/android/app/.gitignore",
+                                      "frontend/android/app/capacitor.build.gradle",
+                                      "frontend/android/app/proguard-rules.pro",
+                                      "frontend/android/app/src/main/res/layout/activity_main.xml",
+                                      "frontend/android/app/src/main/res/values/strings.xml",
+                                      "frontend/android/app/src/test/java/com/getcapacitor/myapp/ExampleUnitTest.java",
+                                      "frontend/android/build.gradle",
+                                      "frontend/android/capacitor.settings.gradle",
+                                      "frontend/android/gradle.properties",
+                                      "frontend/android/gradle/wrapper/gradle-wrapper.jar",
+                                      "frontend/android/gradle/wrapper/gradle-wrapper.properties",
+                                      "frontend/android/gradlew",
+                                      "frontend/android/gradlew.bat",
+                                      "frontend/android/img.png",
+                                      "frontend/android/settings.gradle",
+                                      "frontend/android/variables.gradle",
+                                      "frontend/package.json",
+                                      "frontend/package-lock.json"
+                                  ],
+    "testResults":  {
+                        "backend":  "18 passed",
+                        "lintErrors":  0,
+                        "browser":  "39 route/viewport checks passed",
+                        "frontend":  "25 passed",
+                        "lintWarnings":  [
+                                             {
+                                                 "id":  "UnusedAttribute",
+                                                 "count":  1
+                                             },
+                                             {
+                                                 "id":  "ManifestOrder",
+                                                 "count":  1
+                                             },
+                                             {
+                                                 "id":  "AndroidGradlePluginVersion",
+                                                 "count":  1
+                                             },
+                                             {
+                                                 "id":  "GradleDependency",
+                                                 "count":  1
+                                             },
+                                             {
+                                                 "id":  "ObsoleteSdkInt",
+                                                 "count":  1
+                                             },
+                                             {
+                                                 "id":  "UnusedResources",
+                                                 "count":  4
+                                             },
+                                             {
+                                                 "id":  "MonochromeLauncherIcon",
+                                                 "count":  2
+                                             },
+                                             {
+                                                 "id":  "IconMissingDensityFolder",
+                                                 "count":  1
+                                             }
+                                         ],
+                        "android":  "assembleDebug, testDebugUnitTest, lintDebug passed"
+                    },
+    "apk":  {
+                "sha256":  "7672A1548AE969153700F7C3ACBA4C7051B0081445F9E3F6E55E0D147D967180",
+                "bytes":  4580798,
+                "versionName":  "1.0.0",
+                "applicationId":  "com.smartpgmanager.app",
+                "path":  "frontend/android/app/build/outputs/apk/debug/app-debug.apk",
+                "versionCode":  1
+            }
+}
