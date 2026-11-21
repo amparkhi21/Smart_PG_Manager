@@ -5,6 +5,9 @@ const roomSchema = new mongoose.Schema(
     owner: { type: mongoose.Schema.Types.ObjectId, ref: 'Owner', required: true, index: true },
     roomNumber: { type: String, required: [true, 'Room number is required'], trim: true },
     floor: { type: String, trim: true },
+    roomType: { type: String, trim: true, maxlength: 40 },
+    airConditioning: { type: String, enum: ['AC', 'Non-AC'] },
+    amenities: { type: [{ type: String, trim: true, maxlength: 60 }], default: undefined },
     monthlyRent: { type: Number, required: [true, 'Monthly rent is required'], min: 0 },
     capacity: { type: Number, required: true, min: 1, default: 1 },
     // Latest meter reading entered; used as "previous reading" for the next bill

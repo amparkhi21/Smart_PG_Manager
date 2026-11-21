@@ -14,7 +14,10 @@ import ErrorState from '../components/ui/ErrorState.jsx';
 import IconButton from '../components/ui/IconButton.jsx';
 import { Select } from '../components/ui/FormControls.jsx';
 import ResidentFormModal from '../components/residents/ResidentFormModal.jsx';
+import PgCode from '../components/residents/PgCode.jsx';
 import { formatCurrency, formatDate } from '../utils/format.js';
+
+const ACCOUNT_LABELS = { active: 'Login enabled', disabled: 'Login disabled', unconfigured: 'Not configured' };
 
 const Avatar = ({ name }) => (
   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-navy-50 font-bold text-navy-700">
@@ -26,6 +29,7 @@ export default function Residents() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('Active');
   const [roomFilter, setRoomFilter] = useState('');
+  const [accountStatus, setAccountStatus] = useState('');
   const [formResident, setFormResident] = useState(undefined); // undefined = closed, null = add, object = edit
   const q = useDebounce(search);
 
@@ -38,8 +42,9 @@ export default function Residents() {
     return (await api.get('/residents', { params })).data.data;
   }, [q, status, roomFilter]);
 
-  const residents = data || [];
-  const filtersActive = Boolean(q.trim()) || status !== 'Active' || Boolean(roomFilter);
+  // The existing API returns the complete matching list, including legacy records.
+  const residents = (data || []).filter((resident) => !accountStatus || (resident.accountStatus || 'unconfigured') === accountStatus);
+  const filtersActive = Boolean(q.trim()) || status !== 'Active' || Boolean(roomFilter) || Boolean(accountStatus);
   const closeForm = () => setFormResident(undefined);
   const saved = () => {
     closeForm();
@@ -49,6 +54,7 @@ export default function Residents() {
     setSearch('');
     setStatus('Active');
     setRoomFilter('');
+    setAccountStatus('');
   };
 
   return (
@@ -59,7 +65,9 @@ export default function Residents() {
         </button>
       </PageHeader>
 
-      <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_14rem] md:items-center">
+      <PgCode className="card mb-4 p-4" />
+
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 md:items-center">
         <SearchInput value={search} onChange={setSearch} placeholder="Search by name or phone" />
         <SegmentedControl options={['Active', 'Left', 'All']} value={status} onChange={setStatus} />
         <Select value={roomFilter} onChange={(e) => setRoomFilter(e.target.value)} aria-label="Filter by room">
@@ -67,6 +75,10 @@ export default function Residents() {
           {(rooms || []).map((r) => (
             <option key={r._id} value={r._id}>Room {r.roomNumber}</option>
           ))}
+        </Select>
+        <Select value={accountStatus} onChange={(e) => setAccountStatus(e.target.value)} aria-label="Filter by account status">
+          <option value="">All login accounts</option>
+          {Object.entries(ACCOUNT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </Select>
       </div>
 
@@ -119,13 +131,14 @@ export default function Residents() {
                           <span className="min-w-0">
                             <span className="block truncate font-semibold text-slate-900">{r.fullName}</span>
                             <span className="block text-xs text-slate-500">{r.phone}</span>
+                            {r.email && <span className="block break-all text-xs text-slate-500">{r.email}</span>}
                           </span>
                         </Link>
                       </td>
                       <td className="px-4 py-3 font-medium text-slate-700">{r.room?.roomNumber || '-'}</td>
                       <td className="px-4 py-3 text-slate-600">{formatDate(r.joiningDate)}</td>
                       <td className="px-4 py-3 font-semibold text-slate-900">{formatCurrency(r.monthlyRent)}</td>
-                      <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
+                      <td className="px-4 py-3"><StatusBadge status={r.status} /><p className="mt-1 text-xs text-slate-500">{ACCOUNT_LABELS[r.accountStatus || 'unconfigured']}</p></td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-2">
                           <Link to={`/residents/${r._id}`} className="btn-secondary min-h-10">View profile</Link>
@@ -155,6 +168,8 @@ export default function Residents() {
                     <p className="truncate text-xs text-slate-500">
                       Room {r.room?.roomNumber || '-'} · {r.phone}
                     </p>
+                    {r.email && <p className="truncate text-xs text-slate-500">{r.email}</p>}
+                    <p className="text-xs font-semibold text-slate-600">{ACCOUNT_LABELS[r.accountStatus || 'unconfigured']}</p>
                     <p className="truncate text-xs text-slate-500">
                       {formatCurrency(r.monthlyRent)}/month · Joined {formatDate(r.joiningDate)}
                     </p>

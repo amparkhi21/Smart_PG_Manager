@@ -5,6 +5,7 @@ import ElectricityBill from '../models/ElectricityBill.js';
 import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { findOwned, escapeRegex } from '../utils/ownership.js';
+import { withOccupancyTransaction } from '../utils/occupancyTransaction.js';
 
 export const listRooms = asyncHandler(async (req, res) => {
   const { search, status } = req.query;
@@ -40,11 +41,14 @@ export const getRoom = asyncHandler(async (req, res) => {
 });
 
 export const createRoom = asyncHandler(async (req, res) => {
-  const { roomNumber, floor, monthlyRent, capacity, lastMeterReading, notes } = req.body;
+  const { roomNumber, floor, roomType, airConditioning, amenities, monthlyRent, capacity, lastMeterReading, notes } = req.body;
   const room = await Room.create({
     owner: req.owner._id,
     roomNumber,
     floor,
+    roomType,
+    airConditioning,
+    amenities,
     monthlyRent,
     capacity,
     lastMeterReading,
@@ -54,39 +58,43 @@ export const createRoom = asyncHandler(async (req, res) => {
 });
 
 export const updateRoom = asyncHandler(async (req, res) => {
-  const room = await findOwned(Room, req.params.id, req);
+  const room = await withOccupancyTransaction(req.owner._id, async (session) => {
+  const room = await findOwned(Room, req.params.id, req, undefined, session);
 
   if (req.body.capacity !== undefined) {
-    const active = await Resident.countDocuments({ owner: req.owner._id, room: room._id, status: 'Active' });
+    const active = await Resident.countDocuments({ owner: req.owner._id, room: room._id, status: 'Active' }).session(session);
     if (req.body.capacity < active) {
       throw new ApiError(409, `Room ${room.roomNumber} has ${active} active resident(s). Capacity cannot be less than that.`);
     }
   }
 
   // A rent change only affects residents added and rent generated from now on.
-  ['roomNumber', 'floor', 'monthlyRent', 'capacity', 'notes'].forEach((k) => {
+  ['roomNumber', 'floor', 'roomType', 'airConditioning', 'amenities', 'monthlyRent', 'capacity', 'notes'].forEach((k) => {
     if (req.body[k] !== undefined) room[k] = req.body[k];
   });
-  await room.save();
+  await room.save({ session });
+  return room;
+  });
   res.json({ success: true, message: 'Room updated', data: room });
 });
 
 export const deleteRoom = asyncHandler(async (req, res) => {
-  const room = await findOwned(Room, req.params.id, req);
+  const room = await withOccupancyTransaction(req.owner._id, async (session) => {
+  const room = await findOwned(Room, req.params.id, req, undefined, session);
   const base = { owner: req.owner._id, room: room._id };
 
-  const active = await Resident.countDocuments({ ...base, status: 'Active' });
+  const active = await Resident.countDocuments({ ...base, status: 'Active' }).session(session);
   if (active > 0) {
     throw new ApiError(409, `Room ${room.roomNumber} still has ${active} active resident(s). Move or remove them first.`);
   }
-  const [anyResident, anyRent, anyBill] = await Promise.all([
-    Resident.exists(base),
-    RentRecord.exists(base),
-    ElectricityBill.exists(base),
-  ]);
+  const anyResident = await Resident.exists(base).session(session);
+  const anyRent = await RentRecord.exists(base).session(session);
+  const anyBill = await ElectricityBill.exists(base).session(session);
   if (anyResident || anyRent || anyBill) {
     throw new ApiError(409, `Room ${room.roomNumber} has resident, rent or electricity history, so it cannot be deleted.`);
   }
-  await room.deleteOne();
+  await room.deleteOne({ session });
+  return room;
+  });
   res.json({ success: true, message: `Room ${room.roomNumber} deleted` });
 });

@@ -62,7 +62,7 @@ test('cross-host requests attach the saved JWT and allow Render cold-start time'
 });
 
 test('only protected 401 responses clear sessions; timeouts, outages, and login errors preserve them', async () => {
-  for (const [path, status] of [['/auth/me', undefined], ['/auth/me', 503], ['/auth/login', 401], ['/auth/register', 401], ['/auth/me', 401]]) {
+  for (const [path, status] of [['/auth/me', undefined], ['/auth/me', 503], ['/auth/login', 401], ['/auth/register', 401], ['/auth/resident/login', 401], ['/auth/me', 401]]) {
     const client = sessionClient();
     client.api.defaults.adapter = async (config) => {
       throw new AxiosError('test response', status ? 'ERR_BAD_RESPONSE' : 'ECONNABORTED', config, {}, status ? { status, config } : undefined);

@@ -8,7 +8,8 @@ export { TOKEN_KEY } from './http.js';
 
 // Prefer VITE_API_BASE_URL; production resolves missing/loopback values to Render.
 // Bearer authentication works across Vercel/Render without third-party cookies.
-const baseURL = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL, import.meta.env.PROD);
+const production = import.meta.env.PROD && import.meta.env.MODE !== 'test';
+const baseURL = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL, production);
 export const sessionStorage = createSessionStorage({ native: isAndroid, bridge: Native, browserStorage: localStorage });
 const api = createApiClient({
   baseURL,

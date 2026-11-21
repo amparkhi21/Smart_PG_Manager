@@ -1,0 +1,17 @@
+export const RESIDENT_NAV = [
+  { label: 'Dashboard', to: '/resident/dashboard' },
+  { label: 'My Room', to: '/resident/my-room' },
+  { label: 'Room Availability', to: '/resident/rooms' },
+  { label: 'Room Change Requests', to: '/resident/room-change-requests' },
+  { label: 'My Attendance' },
+  { label: 'Mess Menu', to: '/resident/mess-menu' },
+  { label: 'Community', to: '/resident/community' },
+  { label: 'My Bills & Payments', to: '/resident/payments' },
+  { label: 'My Complaints', to: '/resident/complaints' },
+  { label: 'Notice Board', to: '/resident/notices' },
+  { label: 'Leave Requests', to: '/resident/leave-requests' },
+  { label: 'Emergency Contacts', to: '/resident/emergency-contacts' },
+  { label: 'Notifications', to: '/resident/notifications' },
+  { label: 'My Profile', to: '/resident/profile' },
+  { label: 'Settings', to: '/resident/change-password' },
+];

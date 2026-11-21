@@ -11,6 +11,8 @@ import ErrorState from '../components/ui/ErrorState.jsx';
 import { Field, Input, Select, Textarea } from '../components/ui/FormControls.jsx';
 import { getErrorMessage } from '../utils/format.js';
 import { DEFAULT_REMINDER_TEMPLATES } from '../utils/reminders.js';
+import { validUpiId } from '../utils/upiPayments.js';
+import PushNotificationSettings from '../components/PushNotificationSettings.jsx';
 
 const initialForm = {
   name: '',
@@ -18,6 +20,7 @@ const initialForm = {
   phone: '',
   pgName: '',
   address: '',
+  upiId: '',
   rentDueDay: '5',
   defaultElectricityRate: '8',
   preferredTiming: 'Anytime',
@@ -50,6 +53,7 @@ export default function Settings() {
       phone: owner.phone || '',
       pgName: owner.pgName || '',
       address: owner.address || '',
+      upiId: owner.upiId || '',
       rentDueDay: String(owner.rentDueDay ?? 5),
       defaultElectricityRate: String(owner.defaultElectricityRate ?? 8),
       preferredTiming: reminder.preferredTiming || 'Anytime',
@@ -73,6 +77,7 @@ export default function Settings() {
     const dueDay = Number(form.rentDueDay);
     const electricityRate = Number(form.defaultElectricityRate);
     const intervalHours = Number(form.duplicateWarningHours);
+    if (form.upiId.trim() && !validUpiId(form.upiId)) { setFormError('Enter a valid payment UPI ID, such as name@bank.'); return; }
     if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 28) {
       setFormError('Rent due day must be between 1 and 28.');
       return;
@@ -94,6 +99,7 @@ export default function Settings() {
         phone: form.phone.trim(),
         pgName: form.pgName.trim(),
         address: form.address.trim(),
+        upiId: form.upiId.trim(),
         rentDueDay: dueDay,
         defaultElectricityRate: electricityRate,
         reminderSettings: {
@@ -151,6 +157,9 @@ export default function Settings() {
 
         <Panel title="Billing defaults">
           <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Payment UPI ID" htmlFor="upiId" hint="Residents pay this ID. Verify it in your UPI app before saving; leave empty to disable payment links.">
+              <Input id="upiId" name="upiId" value={form.upiId} onChange={set} maxLength={320} autoCapitalize="none" autoCorrect="off" placeholder="name@bank" />
+            </Field>
             <Field label="Default rent due day" htmlFor="rentDueDay" hint="Used when future rent or electricity bills are generated. Choose a day from 1 to 28." required>
               <Input id="rentDueDay" name="rentDueDay" type="number" min="1" max="28" step="1" value={form.rentDueDay} onChange={set} required />
             </Field>
@@ -216,6 +225,7 @@ export default function Settings() {
           </button>
         </div>
       </form>
+      <PushNotificationSettings />
     </div>
   );
 }

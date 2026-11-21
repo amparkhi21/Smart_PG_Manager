@@ -1,12 +1,16 @@
 import asyncHandler from '../utils/asyncHandler.js';
+import { pgCode } from '../utils/residentAuth.js';
 
 const settingsOwner = (owner) => ({
   id: owner._id,
+  role: 'owner',
+  pgCode: pgCode(owner._id),
   name: owner.name,
   email: owner.email,
   phone: owner.phone,
   pgName: owner.pgName,
   address: owner.address || '',
+  upiId: owner.upiId || '',
   timezone: owner.timezone,
   currency: owner.currency,
   defaultElectricityRate: owner.defaultElectricityRate,
@@ -27,6 +31,7 @@ export const updateSettings = asyncHandler(async (req, res) => {
   if (phone !== undefined) owner.phone = phone;
   if (pgName !== undefined) owner.pgName = pgName;
   if (address !== undefined) owner.address = address;
+  if (req.body.upiId !== undefined) owner.upiId = req.body.upiId;
   if (rentDueDay !== undefined) owner.rentDueDay = rentDueDay;
   if (defaultElectricityRate !== undefined) owner.defaultElectricityRate = defaultElectricityRate;
   if (reminderSettings) {
