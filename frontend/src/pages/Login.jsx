@@ -4,6 +4,7 @@ import { AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
 import AuthLayout from '../layouts/AuthLayout.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getErrorMessage } from '../utils/format.js';
+import { ownerReturnPath } from '../utils/authRouting.js';
 
 export default function Login() {
   const { login } = useAuth();
@@ -22,7 +23,7 @@ export default function Login() {
     setSubmitting(true);
     try {
       await login(form.email.trim(), form.password);
-      navigate(location.state?.from?.pathname || '/', { replace: true });
+      navigate(ownerReturnPath(location.state?.from?.pathname), { replace: true });
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -32,7 +33,7 @@ export default function Login() {
 
   return (
     <AuthLayout title="Welcome back" subtitle="Log in to manage your PG.">
-      <form onSubmit={submit} className="space-y-4" noValidate>
+      <form onSubmit={submit} className="space-y-4">
         {error && (
           <div className="flex items-start gap-2 rounded-xl bg-rose-50 p-3 text-sm text-rose-700" role="alert">
             <AlertCircle size={18} className="mt-0.5 shrink-0" /> <span>{error}</span>
@@ -62,7 +63,7 @@ export default function Login() {
       </form>
       <p className="mt-6 text-center text-sm text-slate-500">
         New PG owner?{' '}
-        <Link to="/register" className="font-semibold text-teal-600 hover:text-teal-700">Create an account</Link>
+        <Link to="/owner/register" className="font-semibold text-teal-600 hover:text-teal-700">Create an account</Link>
       </p>
     </AuthLayout>
   );

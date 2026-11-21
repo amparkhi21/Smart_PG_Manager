@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import api from '../../api/client.js';
 import Modal from '../ui/Modal.jsx';
-import { Field, Input, Textarea } from '../ui/FormControls.jsx';
+import { Field, Input, Textarea, Select } from '../ui/FormControls.jsx';
 import { getErrorMessage } from '../../utils/format.js';
 
 // room = existing room (edit) or null (add). `rooms` is the current list, used for the duplicate check.
@@ -12,6 +12,9 @@ export default function RoomFormModal({ room, rooms, onClose, onSaved }) {
   const [f, setF] = useState({
     roomNumber: room?.roomNumber || '',
     floor: room?.floor || '',
+    roomType: room?.roomType || '',
+    airConditioning: room?.airConditioning || '',
+    amenities: (room?.amenities || []).join(', '),
     monthlyRent: room ? String(room.monthlyRent) : '',
     capacity: room ? String(room.capacity) : '1',
     lastMeterReading: '',
@@ -41,6 +44,8 @@ export default function RoomFormModal({ room, rooms, onClose, onSaved }) {
     if (!editing && f.lastMeterReading !== '' && Number(f.lastMeterReading) < 0) {
       e.lastMeterReading = 'Meter reading cannot be negative';
     }
+    const amenities = f.amenities.split(',').map((value) => value.trim()).filter(Boolean);
+    if (amenities.length > 30 || amenities.some((value) => value.length > 60)) e.amenities = 'Use at most 30 amenities, each up to 60 characters';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -53,6 +58,9 @@ export default function RoomFormModal({ room, rooms, onClose, onSaved }) {
     const payload = {
       roomNumber: f.roomNumber.trim(),
       floor: f.floor.trim(),
+      roomType: f.roomType.trim(),
+      airConditioning: f.airConditioning || null,
+      amenities: [...new Set(f.amenities.split(',').map((value) => value.trim()).filter(Boolean))],
       monthlyRent: Number(f.monthlyRent),
       capacity: Number(f.capacity),
       notes: f.notes.trim(),
@@ -87,6 +95,14 @@ export default function RoomFormModal({ room, rooms, onClose, onSaved }) {
           <Field label="Floor" htmlFor="floor">
             <Input id="floor" name="floor" value={f.floor} onChange={set} placeholder="e.g. 1" />
           </Field>
+          <Field label="Room type" htmlFor="roomType" hint="Optional; visible to residents">
+            <Input id="roomType" name="roomType" value={f.roomType} onChange={set} maxLength={40} placeholder="e.g. Shared, Single, Studio" />
+          </Field>
+          <Field label="Air conditioning" htmlFor="airConditioning">
+            <Select id="airConditioning" name="airConditioning" value={f.airConditioning} onChange={set}>
+              <option value="">Not recorded</option><option value="AC">AC</option><option value="Non-AC">Non-AC</option>
+            </Select>
+          </Field>
           <Field label="Monthly rent (₹)" htmlFor="monthlyRent" error={errors.monthlyRent} required>
             <Input id="monthlyRent" name="monthlyRent" type="number" inputMode="decimal" min="0" step="any" value={f.monthlyRent} onChange={set} invalid={!!errors.monthlyRent} />
           </Field>
@@ -104,6 +120,9 @@ export default function RoomFormModal({ room, rooms, onClose, onSaved }) {
             <Input id="lastMeterReading" name="lastMeterReading" type="number" inputMode="decimal" min="0" step="any" value={f.lastMeterReading} onChange={set} invalid={!!errors.lastMeterReading} />
           </Field>
         )}
+        <Field label="Amenities" htmlFor="amenities" error={errors.amenities} hint="Visible to residents. Separate amenities with commas, e.g. Wi-Fi, wardrobe, study table.">
+          <Textarea id="amenities" name="amenities" value={f.amenities} onChange={set} invalid={!!errors.amenities} />
+        </Field>
         <Field label="Notes" htmlFor="notes">
           <Textarea id="notes" name="notes" value={f.notes} onChange={set} placeholder="Attached bathroom, AC, etc." />
         </Field>

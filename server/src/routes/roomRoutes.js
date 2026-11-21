@@ -15,6 +15,10 @@ const rules = (isUpdate) => {
     f(body('monthlyRent')).isFloat({ min: 0 }).withMessage('Monthly rent must be 0 or more').toFloat(),
     f(body('capacity')).isInt({ min: 1, max: 20 }).withMessage('Capacity must be between 1 and 20').toInt(),
     body('floor').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
+    body('roomType').optional().isString().bail().trim().isLength({ max: 40 }),
+    body('airConditioning').optional({ nullable: true }).isIn(['AC', 'Non-AC']),
+    body('amenities').optional().isArray({ max: 30 }),
+    body('amenities.*').isString().bail().trim().notEmpty().isLength({ max: 60 }),
     body('notes').optional({ checkFalsy: true }).trim().isLength({ max: 300 }),
   ];
   if (!isUpdate) {

@@ -24,7 +24,7 @@ export default function NativeRuntime() {
         const action = backAction(pathname.current, window.history.state?.idx);
         if (action === 'minimize') Native.minimizeApp().catch(() => {});
         else if (action === 'back') navigate(-1);
-        else navigate(action === 'login' ? '/login' : '/', { replace: true });
+        else navigate(action === 'login' ? '/login' : action === 'owner-login' ? '/owner/login' : action === 'resident-home' ? '/resident/dashboard' : '/', { replace: true });
       }),
       listen('resume', () => window.dispatchEvent(new Event('app:resume'))),
     ]).then(() => { if (!disposed) return Native.ready(); }).catch(() => {

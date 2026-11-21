@@ -3,6 +3,8 @@ import bcrypt from 'bcryptjs';
 
 const ownerSchema = new mongoose.Schema(
   {
+    role: { type: String, enum: ['owner'], default: 'owner', immutable: true },
+    occupancyRevision: { type: Number, select: false },
     name: { type: String, required: [true, 'Name is required'], trim: true, maxlength: 80 },
     email: {
       type: String,
@@ -15,6 +17,7 @@ const ownerSchema = new mongoose.Schema(
     password: { type: String, required: true, minlength: 8, select: false },
     phone: { type: String, trim: true },
     pgName: { type: String, required: [true, 'PG name is required'], trim: true, maxlength: 100 },
+    upiId: { type: String, trim: true, maxlength: 320, default: '' },
     address: { type: String, trim: true, maxlength: 300 },
     timezone: { type: String, default: 'Asia/Kolkata' },
     currency: { type: String, default: '₹' },

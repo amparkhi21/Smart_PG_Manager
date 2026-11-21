@@ -135,6 +135,10 @@ export default function ResidentProfile() {
           <Info label="Email">{resident.email || '-'}</Info>
           <Info label="Monthly rent">{formatCurrency(resident.monthlyRent)}</Info>
           <Info label="Joined">{formatDate(resident.joiningDate)}</Info>
+          <Info label="Login account">{resident.accountStatus === 'active' ? 'Enabled' : resident.accountStatus === 'disabled' ? 'Disabled' : 'Not configured'}</Info>
+          <Info label="Activation">{resident.passwordChangeRequired ? 'Password change required' : resident.firstLoginAt ? 'Activated' : 'Not yet activated'}</Info>
+          <Info label="First login">{resident.firstLoginAt ? new Date(resident.firstLoginAt).toLocaleString() : 'Never'}</Info>
+          <Info label="Last successful login">{resident.lastLoginAt ? new Date(resident.lastLoginAt).toLocaleString() : 'Never'}</Info>
           {resident.status === 'Left' && <Info label="Left on">{formatDate(resident.leftDate)}</Info>}
           <Info label="Emergency contact">
             {resident.emergencyContact?.name || resident.emergencyContact?.phone

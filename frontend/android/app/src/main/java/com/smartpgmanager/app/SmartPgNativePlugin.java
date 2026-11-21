@@ -178,7 +178,10 @@ public class SmartPgNativePlugin extends Plugin {
     public void openExternal(PluginCall call) {
         Uri uri = Uri.parse(call.getString("url", ""));
         String scheme = uri.getScheme();
-        if (!("https".equals(scheme) || "tel".equals(scheme) || "mailto".equals(scheme)) || uri.getUserInfo() != null ||
+        boolean upiPayment = "upi".equals(scheme) && "pay".equals(uri.getHost()) && uri.getPort() == -1 && uri.getFragment() == null &&
+            (uri.getPath() == null || uri.getPath().isEmpty()) && "INR".equals(uri.getQueryParameter("cu")) &&
+            uri.getQueryParameter("pa") != null && uri.getQueryParameter("pn") != null && uri.getQueryParameter("am") != null;
+        if (!("https".equals(scheme) || "tel".equals(scheme) || "mailto".equals(scheme) || upiPayment) || uri.getUserInfo() != null ||
             ("https".equals(scheme) && (uri.getHost() == null || uri.getHost().isEmpty()))) {
             call.reject("Unsupported external link"); return;
         }
@@ -196,5 +199,12 @@ public class SmartPgNativePlugin extends Plugin {
             clipboard.setPrimaryClip(ClipData.newPlainText("Smart PG Manager reminder", text));
             call.resolve();
         });
+    }
+
+    @PluginMethod
+    public void getPushConfiguration(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("firebaseConfigured", BuildConfig.FCM_CLIENT_CONFIGURED);
+        call.resolve(result);
     }
 }
