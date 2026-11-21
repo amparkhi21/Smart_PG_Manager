@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import App from './App.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
+import { PushNotificationsProvider } from './context/PushNotificationsContext.jsx';
 import { isAndroid } from './native/platform.js';
 import NativeRuntime from './components/NativeRuntime.jsx';
 import ConnectionNotice from './components/ConnectionNotice.jsx';
@@ -17,8 +18,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <NativeRuntime />
       <ConnectionNotice />
       <AuthProvider>
-        <App />
-        <Toaster position="top-center" toastOptions={{ style: { borderRadius: '12px', fontSize: '14px' } }} />
+        <PushNotificationsProvider>
+          <App />
+          <Toaster position="top-center" toastOptions={{ style: { borderRadius: '12px', fontSize: '14px' } }} />
+        </PushNotificationsProvider>
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>

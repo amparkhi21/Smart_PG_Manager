@@ -1,5 +1,6 @@
 import { IndianRupee, Zap, MessageCircle } from 'lucide-react';
 import BrandMark from '../components/BrandMark.jsx';
+import { Link } from 'react-router-dom';
 
 const POINTS = [
   { icon: IndianRupee, text: 'Track rent and partial payments' },
@@ -7,7 +8,7 @@ const POINTS = [
   { icon: MessageCircle, text: 'WhatsApp reminders in one tap' },
 ];
 
-export default function AuthLayout({ title, subtitle, children }) {
+export default function AuthLayout({ title, subtitle, children, resident = false }) {
   return (
     <div className="grid min-h-dvh lg:grid-cols-2">
       <div className="relative hidden overflow-hidden bg-navy-900 p-12 text-white lg:flex lg:flex-col lg:justify-between">
@@ -19,11 +20,11 @@ export default function AuthLayout({ title, subtitle, children }) {
         </div>
         <div className="relative">
           <h2 className="text-4xl font-extrabold leading-tight">
-            Your whole PG,
+            {resident ? 'Your place,' : 'Your whole PG,'}
             <br />
             <span className="text-orange-400">one app.</span>
           </h2>
-          <ul className="mt-8 space-y-4">
+          {resident ? <p className="mt-8 max-w-sm text-navy-100">A personal space for your PG account. Sign in with the details provided by your owner.</p> : <ul className="mt-8 space-y-4">
             {POINTS.map(({ icon: Icon, text }) => (
               <li key={text} className="flex items-center gap-3 text-navy-100">
                 <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
@@ -32,7 +33,7 @@ export default function AuthLayout({ title, subtitle, children }) {
                 {text}
               </li>
             ))}
-          </ul>
+          </ul>}
         </div>
         <p className="relative text-sm text-navy-200">No more registers and notebooks.</p>
       </div>
@@ -44,6 +45,7 @@ export default function AuthLayout({ title, subtitle, children }) {
             <p className="text-lg font-extrabold text-navy-900">Smart PG Manager</p>
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900">{title}</h1>
+          <Link to="/" className="my-3 inline-flex min-h-11 items-center text-sm font-semibold text-teal-700 hover:text-teal-800">Change Role</Link>
           <p className="mb-6 mt-1 text-slate-500">{subtitle}</p>
           {children}
         </div>

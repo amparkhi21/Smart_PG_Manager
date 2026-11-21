@@ -53,6 +53,12 @@
 .native-android.keyboard-open .modal-panel { max-height: calc(100dvh - var(--app-safe-top) - .5rem); }
 .native-android body { -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
 
+.community-chat { height: clamp(18rem, calc(var(--community-viewport-height, 100dvh) - 15rem - var(--app-safe-top) - var(--app-safe-bottom)), 56rem); }
+.native-android.keyboard-open .community-chat { height: max(12rem, calc(var(--community-viewport-height, 100dvh) - 11rem - var(--app-safe-top) - var(--app-safe-bottom))); }
+@media (min-width: 1024px) {
+  .community-chat { height: clamp(22rem, calc(var(--community-viewport-height, 100dvh) - 13rem - var(--app-safe-top)), 56rem); }
+}
+
 @media (max-width: 639px) {
   .btn, button[role="tab"] { min-height: 44px; }
   .btn { padding-inline: .75rem; }

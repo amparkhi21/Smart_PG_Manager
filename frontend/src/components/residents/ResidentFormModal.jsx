@@ -5,11 +5,12 @@ import api from '../../api/client.js';
 import useFetch from '../../hooks/useFetch.js';
 import Modal from '../ui/Modal.jsx';
 import Skeleton from '../ui/Skeleton.jsx';
-import { Field, Input, Select } from '../ui/FormControls.jsx';
+import { Field, Input, Select, PasswordInput } from '../ui/FormControls.jsx';
+import PgCode from './PgCode.jsx';
 import { formatCurrency, getErrorMessage, toDateInput, todayInput } from '../../utils/format.js';
 
-const PHONE_RE = /^\+?[0-9]{10,13}$/;
-const cleanPhone = (v) => v.replace(/[\s-]/g, '');
+const PHONE_RE = /^\+?[0-9]{10,15}$/;
+const cleanPhone = (v) => v.replace(/[\s().-]/g, '');
 
 // resident = existing resident (edit) or null (add)
 export default function ResidentFormModal({ resident, onClose, onSaved }) {
@@ -30,6 +31,8 @@ export default function ResidentFormModal({ resident, onClose, onSaved }) {
     monthlyRent: resident ? String(resident.monthlyRent) : '',
     emergencyName: resident?.emergencyContact?.name || '',
     emergencyPhone: resident?.emergencyContact?.phone || '',
+    loginEnabled: resident?.loginEnabled || false,
+    temporaryPassword: '',
   });
   const [rentTouched, setRentTouched] = useState(editing);
   const [errors, setErrors] = useState({});
@@ -49,7 +52,13 @@ export default function ResidentFormModal({ resident, onClose, onSaved }) {
     const e = {};
     if (!f.room) e.room = 'Choose a room';
     if (!f.fullName.trim()) e.fullName = 'Full name is required';
-    if (!PHONE_RE.test(cleanPhone(f.phone))) e.phone = 'Enter a valid phone number (10 to 13 digits)';
+    if (!PHONE_RE.test(cleanPhone(f.phone))) e.phone = 'Enter a valid phone number; include +country code outside India';
+    if (f.loginEnabled && (!resident?.accountStatus || resident.accountStatus === 'unconfigured') && !f.temporaryPassword) {
+      e.temporaryPassword = 'Set a temporary password to enable login';
+    }
+    if (f.temporaryPassword && (f.temporaryPassword.length < 8 || new TextEncoder().encode(f.temporaryPassword).length > 72)) {
+      e.temporaryPassword = 'Use at least 8 characters and at most 72 UTF-8 bytes';
+    }
     if (f.email.trim() && !/^\S+@\S+\.\S+$/.test(f.email.trim())) e.email = 'Enter a valid email';
     if (!f.joiningDate) e.joiningDate = 'Joining date is required';
     if (f.monthlyRent === '' || Number.isNaN(Number(f.monthlyRent)) || Number(f.monthlyRent) < 0) {
@@ -75,6 +84,8 @@ export default function ResidentFormModal({ resident, onClose, onSaved }) {
       phone: cleanPhone(f.phone),
       joiningDate: f.joiningDate,
       monthlyRent: Number(f.monthlyRent),
+      loginEnabled: f.loginEnabled,
+      ...(f.temporaryPassword && { temporaryPassword: f.temporaryPassword }),
     };
     if (editing) {
       payload.email = f.email.trim();
@@ -169,6 +180,25 @@ export default function ResidentFormModal({ resident, onClose, onSaved }) {
             </Field>
           </div>
         </div>
+
+        <fieldset className="space-y-4 rounded-xl border border-teal-100 bg-teal-50/50 p-4">
+          <legend className="px-1 text-sm font-bold text-navy-900">Resident login access</legend>
+          <PgCode />
+          <p className="text-sm text-slate-600">Share this code and your PG name with the resident.</p>
+          <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-semibold text-slate-800">
+            <input type="checkbox" checked={f.loginEnabled} onChange={(event) => setF((value) => ({ ...value, loginEnabled: event.target.checked }))} className="h-5 w-5 accent-teal-600" /> Enable resident login
+          </label>
+          <Field htmlFor="temporaryPassword" label={resident?.accountStatus && resident.accountStatus !== 'unconfigured' ? 'Reset temporary password' : 'Temporary login password'} error={errors.temporaryPassword}
+            hint={resident?.accountStatus && resident.accountStatus !== 'unconfigured' ? 'Leave blank to keep the password. A reset signs out existing sessions and requires a password change.' : 'Required to activate login. The resident must change this on first login.'}>
+            <PasswordInput id="temporaryPassword" name="temporaryPassword" value={f.temporaryPassword} onChange={set} autoComplete="new-password" invalid={!!errors.temporaryPassword} />
+          </Field>
+          {editing && <dl className="grid gap-3 text-sm sm:grid-cols-2">
+            <div><dt className="text-slate-500">Account status</dt><dd className="font-semibold capitalize">{resident.accountStatus || 'unconfigured'}</dd></div>
+            <div><dt className="text-slate-500">Password activation</dt><dd className="font-semibold">{resident.passwordChangeRequired ? 'Password change required' : resident.firstLoginAt ? 'Activated' : 'Not yet activated'}</dd></div>
+            <div><dt className="text-slate-500">First login</dt><dd>{resident.firstLoginAt ? new Date(resident.firstLoginAt).toLocaleString() : 'Never'}</dd></div>
+            <div><dt className="text-slate-500">Last successful login</dt><dd>{resident.lastLoginAt ? new Date(resident.lastLoginAt).toLocaleString() : 'Never'}</dd></div>
+          </dl>}
+        </fieldset>
 
         <div className="flex gap-3 pt-1">
           <button type="button" onClick={onClose} disabled={saving} className="btn-secondary flex-1">Cancel</button>

@@ -3,6 +3,7 @@ import { ChevronDown, LogOut } from 'lucide-react';
 import BrandMark from './BrandMark.jsx';
 import { registerBackHandler } from '../native/backNavigation.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import NotificationBell from './NotificationBell.jsx';
 
 export default function Header() {
   const { owner, logout } = useAuth();
@@ -44,7 +45,7 @@ export default function Header() {
           )}
         </div>
 
-        <div className="relative shrink-0" ref={ref}>
+        <div className="flex shrink-0 items-center gap-2"><NotificationBell /><div className="relative shrink-0" ref={ref}>
           <button
             onClick={() => setOpen((o) => !o)}
             className="flex min-h-11 min-w-11 items-center gap-2 rounded-xl p-1 pr-2 hover:bg-slate-50"
@@ -73,7 +74,7 @@ export default function Header() {
               </button>
             </div>
           )}
-        </div>
+        </div></div>
       </div>
     </header>
   );

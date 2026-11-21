@@ -8,13 +8,13 @@ import asyncHandler from '../utils/asyncHandler.js';
 import { findOwned, escapeRegex } from '../utils/ownership.js';
 import { refreshOverdue, round2 } from '../utils/billing.js';
 import { currentMonthIST } from '../utils/dates.js';
+import { applyLoginAccess } from '../utils/residentAuth.js';
+import { withOccupancyTransaction } from '../utils/occupancyTransaction.js';
 
-// Capacity check. (For a single-owner app this is safe; two simultaneous requests
-// adding to the last free bed could theoretically both pass.)
-async function assertCapacity(ownerId, room, excludeResidentId) {
+async function assertCapacity(ownerId, room, excludeResidentId, session) {
   const filter = { owner: ownerId, room: room._id, status: 'Active' };
   if (excludeResidentId) filter._id = { $ne: excludeResidentId };
-  const active = await Resident.countDocuments(filter);
+  const active = await Resident.countDocuments(filter).session(session);
   if (active >= room.capacity) {
     throw new ApiError(409, `Room ${room.roomNumber} is full (${active}/${room.capacity} beds taken)`);
   }
@@ -64,10 +64,11 @@ export const getResidentProfile = asyncHandler(async (req, res) => {
 
 export const createResident = asyncHandler(async (req, res) => {
   const { fullName, phone, email, joiningDate, monthlyRent, emergencyContact } = req.body;
-  const room = await findOwned(Room, req.body.room, req);
-  await assertCapacity(req.owner._id, room);
+  const { resident, room } = await withOccupancyTransaction(req.owner._id, async (session) => {
+  const room = await findOwned(Room, req.body.room, req, undefined, session);
+  await assertCapacity(req.owner._id, room, undefined, session);
 
-  const resident = await Resident.create({
+  const resident = new Resident({
     owner: req.owner._id,
     room: room._id,
     fullName,
@@ -77,22 +78,30 @@ export const createResident = asyncHandler(async (req, res) => {
     monthlyRent: monthlyRent ?? room.monthlyRent, // defaults to the room's rent
     emergencyContact,
   });
+  await applyLoginAccess(resident, req.body);
+  await resident.save({ session });
+  return { resident, room };
+  });
   res.status(201).json({ success: true, message: `${resident.fullName} added to room ${room.roomNumber}`, data: resident });
 });
 
 export const updateResident = asyncHandler(async (req, res) => {
-  const resident = await findOwned(Resident, req.params.id, req);
+  const resident = await withOccupancyTransaction(req.owner._id, async (session) => {
+  const resident = await findOwned(Resident, req.params.id, req, undefined, session);
   if (resident.status === 'Left') throw new ApiError(409, 'This resident has left and can no longer be edited');
 
   if (req.body.room && String(req.body.room) !== String(resident.room)) {
-    const newRoom = await findOwned(Room, req.body.room, req);
-    await assertCapacity(req.owner._id, newRoom, resident._id);
+    const newRoom = await findOwned(Room, req.body.room, req, undefined, session);
+    await assertCapacity(req.owner._id, newRoom, resident._id, session);
     resident.room = newRoom._id; // old rent records keep their original room
   }
   ['fullName', 'phone', 'email', 'joiningDate', 'monthlyRent', 'emergencyContact'].forEach((k) => {
     if (req.body[k] !== undefined) resident[k] = req.body[k];
   });
-  await resident.save();
+  await applyLoginAccess(resident, req.body);
+  await resident.save({ session });
+  return resident;
+  });
   res.json({ success: true, message: 'Resident updated', data: resident });
 });
 
