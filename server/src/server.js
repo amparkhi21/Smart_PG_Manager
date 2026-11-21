@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import { validateEnv } from './config/env.js';
 
 let server;
+let stopPushWorker;
 let shuttingDown = false;
 
 async function shutdown(signal) {
@@ -13,6 +14,7 @@ async function shutdown(signal) {
   const deadline = setTimeout(() => process.exit(1), 10000);
   deadline.unref();
   if (server) await new Promise((resolve) => server.close(resolve));
+  await stopPushWorker?.();
   await mongoose.disconnect();
   clearTimeout(deadline);
   process.exit(0);
@@ -33,6 +35,8 @@ try {
 try {
   const { default: app } = await import('./app.js');
   await connectDB();
+  const { startPushWorker } = await import('./utils/pushNotifications.js');
+  stopPushWorker = startPushWorker();
   server = app.listen(configuration.port, '0.0.0.0', () => console.log(`Smart PG Manager API running on port ${configuration.port}`));
   server.on('error', () => {
     console.error('HTTP server failed to listen. Check PORT and service configuration.');

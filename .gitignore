@@ -37,6 +37,12 @@ data-exports/
 *.pem
 *.key
 *.p12
+*.pfx
+*.pk8
+# Firebase Admin credentials belong only in server environment secrets.
+**/*service-account*.json
+**/serviceAccount*.json
+**/*firebase-adminsdk*.json
 .codex/
 .agents/
 
@@ -55,3 +61,6 @@ frontend/android/app/release/
 **/.idea/
 **/.gradle/
 **/local.properties
+
+# Phase patch scaffolding; release source is under server/ and frontend/.
+/phase5a/

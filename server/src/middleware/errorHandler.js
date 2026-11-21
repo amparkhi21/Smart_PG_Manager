@@ -17,9 +17,13 @@ export const errorHandler = (err, req, res, next) => {
   } else if (err.name === 'CastError') {
     status = 400;
     message = `Invalid value for ${err.path}`;
+  } else if (err.name === 'VersionError') {
+    status = 409;
+    message = 'This record changed. Refresh and try again.';
+    errors = undefined;
   } else if (err.code === 11000) {
     status = 409;
-    message = `${Object.keys(err.keyValue || {}).join(', ') || 'Record'} already exists`;
+    message = err.keyPattern?.normalizedPhone ? 'A login account with this phone already exists in your PG' : 'A record with these details already exists';
   }
 
   const isProd = process.env.NODE_ENV === 'production';

@@ -2,10 +2,11 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/Sidebar.jsx';
 import Header from '../components/Header.jsx';
 import BottomNav from '../components/BottomNav.jsx';
+import { NotificationProvider } from '../context/NotificationContext.jsx';
 
 export default function AppLayout() {
   return (
-    <div className="min-h-dvh lg:pl-64">
+    <NotificationProvider><div className="min-h-dvh lg:pl-64">
       <Sidebar />
       <div className="flex min-h-dvh min-w-0 flex-col">
         <Header />
@@ -14,6 +15,6 @@ export default function AppLayout() {
         </main>
       </div>
       <BottomNav />
-    </div>
+    </div></NotificationProvider>
   );
 }

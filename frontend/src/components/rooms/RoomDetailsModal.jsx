@@ -44,9 +44,12 @@ export default function RoomDetailsModal({ roomId, onClose, onEdit }) {
             <Fact label="Monthly rent" value={formatCurrency(room.monthlyRent)} />
             <Fact label="Occupancy" value={`${room.residents.length} / ${room.capacity} beds`} />
             <Fact label="Floor" value={room.floor || '-'} />
+            <Fact label="Room type" value={room.roomType || 'Not recorded'} />
+            <Fact label="Air conditioning" value={room.airConditioning || 'Not recorded'} />
             <Fact label="Last meter reading" value={room.lastMeterReading} />
           </div>
           {room.notes && <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">{room.notes}</p>}
+          <section><h3 className="mb-2 font-bold text-slate-900">Amenities</h3><p className="break-words text-sm text-slate-600">{room.amenities?.length ? room.amenities.join(', ') : 'Not recorded'}</p></section>
 
           <section>
             <h3 className="mb-2 flex items-center gap-2 font-bold text-slate-900"><Users size={17} /> Residents</h3>

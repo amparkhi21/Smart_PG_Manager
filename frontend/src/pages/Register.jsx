@@ -5,6 +5,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import AuthLayout from '../layouts/AuthLayout.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getErrorMessage } from '../utils/format.js';
+import { PasswordInput } from '../components/ui/FormControls.jsx';
 
 export default function Register() {
   const { register } = useAuth();
@@ -41,7 +42,7 @@ export default function Register() {
 
   return (
     <AuthLayout title="Create your account" subtitle="Set up your PG in a minute.">
-      <form onSubmit={submit} className="space-y-4" noValidate>
+      <form onSubmit={submit} className="space-y-4">
         {error && (
           <div className="flex items-start gap-2 rounded-xl bg-rose-50 p-3 text-sm text-rose-700" role="alert">
             <AlertCircle size={18} className="mt-0.5 shrink-0" /> <span>{error}</span>
@@ -66,12 +67,12 @@ export default function Register() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="password">Password</label>
-            <input id="password" name="password" type="password" required minLength={8} className="input"
+            <PasswordInput id="password" name="password" required minLength={8}
               value={form.password} onChange={update} autoComplete="new-password" placeholder="Min 8 characters" />
           </div>
           <div>
             <label className="label" htmlFor="confirm">Confirm password</label>
-            <input id="confirm" name="confirm" type="password" required className="input"
+            <PasswordInput id="confirm" name="confirm" required
               value={form.confirm} onChange={update} autoComplete="new-password" />
           </div>
         </div>
@@ -82,7 +83,7 @@ export default function Register() {
       </form>
       <p className="mt-6 text-center text-sm text-slate-500">
         Already have an account?{' '}
-        <Link to="/login" className="font-semibold text-teal-600 hover:text-teal-700">Log in</Link>
+        <Link to="/owner/login" className="font-semibold text-teal-600 hover:text-teal-700">Log in</Link>
       </p>
     </AuthLayout>
   );
