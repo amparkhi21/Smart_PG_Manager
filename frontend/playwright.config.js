@@ -9,7 +9,7 @@ export default defineConfig({
     screenshot: 'only-on-failure', trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'npm run dev -- --configLoader runner --host 127.0.0.1 --port 4179 --strictPort',
+    command: 'npm run build -- --mode test --emptyOutDir --configLoader runner && npm run preview -- --host 127.0.0.1 --port 4179 --strictPort --configLoader runner',
     url: 'http://127.0.0.1:4179', reuseExistingServer: false,
     env: { VITE_API_BASE_URL: 'http://127.0.0.1:4179/api' },
   },

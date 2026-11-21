@@ -66,13 +66,24 @@ const storedToken = (page) => page.evaluate(() => localStorage.getItem('pg_token
 async function seedToken(page, token) {
   await page.addInitScript((value) => localStorage.setItem('pg_token', value), token);
 }
+
 async function residentLogin(page) {
-  await page.goto('/resident/login');
+  await page.goto('/resident/login', {
+    waitUntil: 'domcontentloaded'
+  });
+
   await page.getByLabel('Hostel / PG Name', { exact: true }).fill('Test Hostel');
   await page.getByLabel('Room Number', { exact: true }).fill('101');
   await page.getByLabel('Phone Number', { exact: true }).fill('9876543210');
   await page.getByLabel('Password', { exact: true }).fill('Temporary123!');
-  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+
+  await Promise.all([
+    page.waitForResponse(response =>
+      new URL(response.url()).pathname === '/api/auth/resident/login' &&
+      response.request().method() === 'POST'
+    ),
+    page.getByRole('button', { name: 'Log in', exact: true }).click()
+  ]);
 }
 
 test('role picker, Change Role, accessible password visibility and mobile widths', async ({ page }, testInfo) => {
@@ -120,9 +131,27 @@ test('first login is enforced across routes and refresh, then the new session pe
   await mockAPI(page, { temporary: true });
   await residentLogin(page);
   await expect(page).toHaveURL(/\/resident\/change-password$/);
-  await page.goto('/resident/dashboard');
+
+  const restoredSession = page.waitForResponse(response => {
+    const url = new URL(response.url());
+    return url.origin === 'http://127.0.0.1:4179' && url.pathname === '/api/auth/session'
+      && response.request().method() === 'GET';
+  });
+  await page.goto('/resident/dashboard', { waitUntil: 'commit' });
+  const sessionResponse = await restoredSession;
+  expect((await sessionResponse.json()).data.resident.passwordChangeRequired).toBe(true);
   await expect(page).toHaveURL(/\/resident\/change-password$/);
-  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Set your own password' })).toBeVisible();
+
+  const reloadedSession = page.waitForResponse(response => {
+    const url = new URL(response.url());
+    return url.origin === 'http://127.0.0.1:4179' && url.pathname === '/api/auth/session'
+      && response.request().method() === 'GET';
+  });
+  await page.reload({ waitUntil: 'commit' });
+  const reloadedSessionResponse = await reloadedSession;
+  expect(await storedToken(page)).toBe('resident-token');
+  expect((await reloadedSessionResponse.json()).data.resident.passwordChangeRequired).toBe(true);
   await expect(page.getByRole('heading', { name: 'Set your own password' })).toBeVisible();
   await page.getByLabel('Temporary password', { exact: true }).fill('Temporary123!');
   await page.getByLabel('New password', { exact: true }).fill('Personal456!');
@@ -131,7 +160,7 @@ test('first login is enforced across routes and refresh, then the new session pe
   await expect(page).toHaveURL(/\/resident\/dashboard$/);
   await expect(page.getByRole('heading', { name: 'Welcome, Test Resident' })).toBeVisible();
   expect(await storedToken(page)).toBe('resident-token-changed');
-  await page.reload();
+  await page.reload({ waitUntil: 'commit' });
   await expect(page.getByRole('heading', { name: 'Welcome, Test Resident' })).toBeVisible();
   await page.getByRole('button', { name: 'Logout', exact: true }).first().click();
   await expect(page).toHaveURL(/\/resident\/login$/); expect(await storedToken(page)).toBeNull();
@@ -311,7 +340,8 @@ test('resident portal displays API rent and attendance, refreshes profile and su
   await page.setViewportSize({ width: 360, height: 800 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.getByRole('button', { name: 'Open navigation' }).click();
-  expect(await page.evaluate(async () => (await import('/src/native/backNavigation.js')).dismissTopLayer())).toBe(true);
+  await expect(page.getByRole('button', { name: 'Close navigation' })).toBeVisible();
+  await page.getByRole('button', { name: 'Close navigation' }).click();
   await expect(page.getByRole('button', { name: 'Open navigation' })).toBeVisible();
   await page.getByRole('button', { name: 'Open navigation' }).click();
   const residentNav = page.getByRole('navigation', { name: 'Resident navigation' });

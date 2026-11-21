@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import Login from './pages/Login.jsx';
+import ResidentChangePassword from './pages/ResidentChangePassword.jsx';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute, PublicRoute } from './components/ProtectedRoute.jsx';
 import AppLayout from './layouts/AppLayout.jsx';
@@ -20,7 +21,6 @@ const Reports = lazy(() => import('./pages/Reports.jsx'));
 const ResidentLogin = lazy(() => import('./pages/ResidentLogin.jsx'));
 const ResidentDashboard = lazy(() => import('./pages/ResidentDashboard.jsx'));
 const ResidentAccount = lazy(() => import('./pages/ResidentAccount.jsx'));
-const ResidentChangePassword = lazy(() => import('./pages/ResidentChangePassword.jsx'));
 const ResidentMyRoom = lazy(() => import('./pages/ResidentMyRoom.jsx'));
 const ResidentRoomAvailability = lazy(() => import('./pages/ResidentRoomAvailability.jsx'));
 const RoomChangeRequests = lazy(() => import('./pages/RoomChangeRequests.jsx'));

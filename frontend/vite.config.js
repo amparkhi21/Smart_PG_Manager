@@ -5,11 +5,13 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
-  const productionApiUrl = command === 'build' ? resolveApiBaseUrl(env.VITE_API_BASE_URL, true) : undefined;
+  const buildApiUrl = command === 'build'
+    ? resolveApiBaseUrl(env.VITE_API_BASE_URL, mode !== 'test')
+    : undefined;
   return {
     plugins: [react(), tailwindcss()],
-    // Inline the resolved public URL so even a local .env cannot leak localhost into dist.
-    define: command === 'build' ? { 'import.meta.env.VITE_API_BASE_URL': JSON.stringify(productionApiUrl) } : {},
+    // Production builds enforce HTTPS; only the test mode may target a local mocked API.
+    define: command === 'build' ? { 'import.meta.env.VITE_API_BASE_URL': JSON.stringify(buildApiUrl) } : {},
     server: {
       port: 5173,
       // Development only; production always uses the resolved HTTPS API URL.
