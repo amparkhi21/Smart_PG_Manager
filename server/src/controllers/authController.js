@@ -3,14 +3,12 @@ import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import generateToken from '../utils/generateToken.js';
 import bcrypt from 'bcryptjs';
-import { pgCode } from '../utils/residentAuth.js';
 
 const dummyHash = bcrypt.hashSync('invalid-owner-credentials', 12);
 
 const publicOwner = (o) => ({
   id: o._id,
   role: 'owner',
-  pgCode: pgCode(o._id),
   name: o.name,
   email: o.email,
   phone: o.phone,

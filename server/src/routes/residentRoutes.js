@@ -16,7 +16,7 @@ const rules = (isUpdate) => {
   const f = (chain) => (isUpdate ? chain.optional() : chain);
   return [
     f(body('room')).isMongoId().withMessage('A valid room is required'),
-    body('bedNumber').optional({ nullable: true }).isString().bail().trim().isLength({ max: 20 }).withMessage('Bed number must be 20 characters or fewer'),
+    f(body('bedNumber')).isString().bail().trim().notEmpty().isLength({ max: 20 }).withMessage('A bed number is required'),
     f(body('fullName')).trim().notEmpty().withMessage('Full name is required').isLength({ max: 80 }),
     f(body('phone'))
       .customSanitizer((v) => typeof v === 'string' ? v.replace(/[\s().-]/g, '') : v)

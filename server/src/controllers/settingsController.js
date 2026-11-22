@@ -1,10 +1,8 @@
 import asyncHandler from '../utils/asyncHandler.js';
-import { pgCode } from '../utils/residentAuth.js';
 
 const settingsOwner = (owner) => ({
   id: owner._id,
   role: 'owner',
-  pgCode: pgCode(owner._id),
   name: owner.name,
   email: owner.email,
   phone: owner.phone,

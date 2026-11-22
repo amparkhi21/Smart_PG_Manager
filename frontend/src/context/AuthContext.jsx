@@ -94,12 +94,6 @@ export function AuthProvider({ children }) {
     return data.data.resident;
   }, [saveSession]);
 
-  const activateResident = useCallback(async (payload) => {
-    const { data } = await api.post('/auth/resident/join/activate', payload);
-    await saveSession(data.data);
-    return data.data.resident;
-  }, [saveSession]);
-
   const changeResidentPassword = useCallback(async (payload) => {
     const { data } = await api.post('/auth/resident/change-password', payload);
     await saveSession(data.data);
@@ -121,8 +115,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   const value = useMemo(() => ({ owner, resident, role: owner ? 'owner' : resident ? 'resident' : null,
-    loading, sessionError, restoreSession, login, register, loginResident, activateResident, changeResidentPassword, logout, updateOwner }),
-    [owner, resident, loading, sessionError, restoreSession, login, register, loginResident, activateResident, changeResidentPassword, logout, updateOwner]);
+    loading, sessionError, restoreSession, login, register, loginResident, changeResidentPassword, logout, updateOwner }),
+    [owner, resident, loading, sessionError, restoreSession, login, register, loginResident, changeResidentPassword, logout, updateOwner]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

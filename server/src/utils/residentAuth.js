@@ -11,8 +11,6 @@ export function normalizePhone(value) {
   return null;
 }
 
-// Owner ObjectIds already identify PGs uniquely and never change on PG renames.
-export const pgCode = (ownerId) => `PG-${String(ownerId).toUpperCase()}`;
 export const validPassword = (value) => typeof value === 'string'
   && value.length >= 8 && Buffer.byteLength(value, 'utf8') <= 72;
 
@@ -27,7 +25,7 @@ export async function applyLoginAccess(resident, input) {
   }
   if (input.loginEnabled !== undefined) {
     if (typeof input.loginEnabled !== 'boolean') throw new ApiError(400, 'Login access must be true or false');
-    if (input.loginEnabled && resident.accountStatus === 'unconfigured') {
+    if (input.loginEnabled && (!resident.passwordHash || resident.accountStatus === 'unconfigured')) {
       throw new ApiError(400, 'Set a temporary password to enable login');
     }
     resident.loginEnabled = input.loginEnabled;
@@ -47,7 +45,7 @@ export function publicResident(resident, owner, room) {
     accountStatus: resident.accountStatus, firstLoginAt: resident.firstLoginAt || null,
     lastLoginAt: resident.lastLoginAt || null, passwordChangeRequired: resident.passwordChangeRequired,
     bedNumber: resident.bedNumber || null,
-    pgName: owner.pgName, pgCode: pgCode(owner._id),
+    pgName: owner.pgName, pgId: String(owner._id),
     room: { id: room._id, roomNumber: room.roomNumber },
   };
 }

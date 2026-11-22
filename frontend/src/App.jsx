@@ -19,7 +19,6 @@ const Reminders = lazy(() => import('./pages/Reminders.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 const Reports = lazy(() => import('./pages/Reports.jsx'));
 const ResidentLogin = lazy(() => import('./pages/ResidentLogin.jsx'));
-const ResidentJoin = lazy(() => import('./pages/ResidentJoin.jsx'));
 const ResidentDashboard = lazy(() => import('./pages/ResidentDashboard.jsx'));
 const ResidentAccount = lazy(() => import('./pages/ResidentAccount.jsx'));
 const ResidentMyRoom = lazy(() => import('./pages/ResidentMyRoom.jsx'));
@@ -43,7 +42,7 @@ export default function App() {
           <Route path="/owner/login" element={<Login />} />
           <Route path="/owner/register" element={<Register />} />
           <Route path="/resident/login" element={<ResidentLogin />} />
-          <Route path="/resident/join" element={<ResidentJoin />} />
+          <Route path="/resident/join" element={<Navigate to="/resident/login" replace />} />
         </Route>
 
         <Route element={<ProtectedRoute />}>
