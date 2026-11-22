@@ -4,6 +4,7 @@ import { normalizePhone } from '../utils/residentAuth.js';
 const hideCredentials = (doc, value) => {
   delete value.passwordHash;
   delete value.sessionVersion;
+  delete value.activationInvitations;
   return value;
 };
 
@@ -12,6 +13,14 @@ const residentSchema = new mongoose.Schema(
     owner: { type: mongoose.Schema.Types.ObjectId, ref: 'Owner', required: true, index: true },
     role: { type: String, enum: ['resident'], default: 'resident', immutable: true },
     room: { type: mongoose.Schema.Types.ObjectId, ref: 'Room', required: true },
+    bedNumber: { type: String, trim: true, maxlength: 20 },
+    bedAssignments: [{
+      room: { type: mongoose.Schema.Types.ObjectId, ref: 'Room', required: true },
+      roomNumber: { type: String, required: true, maxlength: 20 },
+      bedNumber: { type: String, required: true, maxlength: 20 },
+      assignedAt: { type: Date, required: true },
+      releasedAt: { type: Date },
+    }],
     fullName: { type: String, required: [true, 'Full name is required'], trim: true, maxlength: 80 },
     phone: {
       type: String,
@@ -35,6 +44,18 @@ const residentSchema = new mongoose.Schema(
     accountStatus: { type: String, enum: ['unconfigured', 'active', 'disabled'], default: 'unconfigured' },
     sessionVersion: { type: Number, default: 0 },
     passwordChangeRequired: { type: Boolean, default: false },
+    // Stored on the resident so single-use activation and account creation can be
+    // consumed in one atomic document update, including on standalone MongoDB.
+    activationInvitations: { type: [{
+      codeHash: { type: String, required: true },
+      room: { type: mongoose.Schema.Types.ObjectId, ref: 'Room', required: true },
+      roomNumber: { type: String, required: true, maxlength: 20 },
+      bedNumber: { type: String, required: true, maxlength: 20 },
+      expiresAt: { type: Date, required: true },
+      createdAt: { type: Date, required: true, default: Date.now },
+      usedAt: { type: Date, default: null },
+      revokedAt: { type: Date, default: null },
+    }], select: false, default: undefined },
     firstLoginAt: { type: Date },
     lastLoginAt: { type: Date },
     noticeSeenAt: { type: Date },

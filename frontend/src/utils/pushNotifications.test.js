@@ -7,7 +7,7 @@ const payload = { notificationId: '444444444444444444444444', type: 'complaint_r
   relatedEntityId: '333333333333333333333333', recipientRole: 'resident', recipientId: identity.id, pgId: identity.pgId };
 
 test('push taps require the exact authenticated account, PG and approved destination', () => {
-  assert.equal(validPushNotification(payload, identity).target.path, '/resident/complaints');
+  assert.equal(validPushNotification(payload, identity).target.path, '/resident/requests');
   for (const change of [{ recipientId: '555555555555555555555555' }, { recipientRole: 'owner' },
     { pgId: '555555555555555555555555' }, { path: 'https://example.com' }, { notificationId: '../x' }]) {
     assert.equal(validPushNotification({ ...payload, ...change }, identity), null);
@@ -17,9 +17,9 @@ test('push taps require the exact authenticated account, PG and approved destina
 
 test('push taps accept only the existing supported notification destinations', () => {
   const supported = [
-    ['owner', 'complaint_created', '/complaints'], ['owner', 'payment_claim_submitted', '/payment-requests'],
+    ['owner', 'complaint_created', '/requests'], ['owner', 'payment_claim_submitted', '/payment-requests'],
     ['owner', 'leave_requested', '/leave-requests'], ['owner', 'room_change_requested', '/room-change-requests'],
-    ['resident', 'complaint_response', '/resident/complaints'], ['resident', 'payment_approved', '/resident/payments'],
+    ['resident', 'complaint_response', '/resident/requests'], ['resident', 'payment_approved', '/resident/payments'],
     ['resident', 'leave_approved', '/resident/leave-requests'], ['resident', 'room_change_approved', '/resident/room-change-requests'],
     ['resident', 'notice_published', '/resident/notices'],
   ];

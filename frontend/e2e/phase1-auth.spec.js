@@ -25,6 +25,8 @@ async function mockAPI(page, { temporary = false, expired = false, outage = fals
     }
     if (path === '/auth/login' || path === '/auth/register') return fulfill({ owner, token: 'owner-token' });
     if (path === '/auth/resident/login') return loginError ? fulfill('Invalid resident credentials', 401) : fulfill({ role: 'resident', resident: state.resident, token: 'resident-token' });
+    if (path === '/auth/resident/join/verify') return fulfill({ challenge: 'temporary-join-challenge' });
+    if (path === '/auth/resident/join/activate') return fulfill({ role: 'resident', resident: state.resident, token: 'resident-joined-token' });
     if (path === '/auth/resident/change-password') {
       state.resident.passwordChangeRequired = false;
       return fulfill({ role: 'resident', resident: state.resident, token: 'resident-token-changed' });
@@ -73,7 +75,6 @@ async function residentLogin(page) {
   });
 
   await page.getByLabel('Hostel / PG Name', { exact: true }).fill('Test Hostel');
-  await page.getByLabel('Room Number', { exact: true }).fill('101');
   await page.getByLabel('Phone Number', { exact: true }).fill('9876543210');
   await page.getByLabel('Password', { exact: true }).fill('Temporary123!');
 
@@ -85,6 +86,26 @@ async function residentLogin(page) {
     page.getByRole('button', { name: 'Log in', exact: true }).click()
   ]);
 }
+
+test('first-time PG joining begins with four details, verifies an invitation, and creates a resident session', async ({ page }) => {
+  const state = await mockAPI(page);
+  await page.goto('/resident/join', { waitUntil: 'domcontentloaded' });
+  const initialForm = page.locator('form').first();
+  await expect(initialForm.locator('input')).toHaveCount(4);
+  await page.getByLabel('Hostel / PG Name', { exact: true }).fill('Test Hostel');
+  await page.getByLabel('PG Joining Password', { exact: true }).fill('JoiningPass123!');
+  await page.getByLabel('Room Number', { exact: true }).fill('101');
+  await page.getByLabel('Bed Number', { exact: true }).fill('1A');
+  await page.getByRole('button', { name: 'Verify PG and bed' }).click();
+  await page.getByLabel('Activation code', { exact: true }).fill('single-use-code-from-owner');
+  await page.getByLabel('Create personal password', { exact: true }).fill('PersonalPass123!');
+  await page.getByLabel('Confirm personal password', { exact: true }).fill('PersonalPass123!');
+  await page.getByRole('button', { name: 'Set password and join' }).click();
+  await expect(page).toHaveURL(/\/resident\/dashboard$/);
+  expect(await storedToken(page)).toBe('resident-joined-token');
+  expect(state.calls).toContain('/auth/resident/join/verify');
+  expect(state.calls).toContain('/auth/resident/join/activate');
+});
 
 test('role picker, Change Role, accessible password visibility and mobile widths', async ({ page }, testInfo) => {
 

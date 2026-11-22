@@ -52,6 +52,21 @@ export default function RoomDetailsModal({ roomId, onClose, onEdit }) {
           <section><h3 className="mb-2 font-bold text-slate-900">Amenities</h3><p className="break-words text-sm text-slate-600">{room.amenities?.length ? room.amenities.join(', ') : 'Not recorded'}</p></section>
 
           <section>
+            <h3 className="mb-2 font-bold text-slate-900">Beds</h3>
+            {room.bedNumbers?.length ? (
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {room.bedNumbers.map((bedNumber) => {
+                  const occupant = room.residents.find((r) => r.bedNumber?.toLocaleLowerCase() === bedNumber.toLocaleLowerCase());
+                  return <li key={bedNumber} className="rounded-xl bg-slate-50 p-3 text-sm">
+                    <span className="font-semibold text-slate-800">Bed {bedNumber}</span>
+                    <span className="ml-2 text-slate-500">{occupant ? `Assigned to ${occupant.fullName}` : 'Available'}</span>
+                  </li>;
+                })}
+              </ul>
+            ) : <p className="text-sm text-slate-500">No beds configured. This room remains usable; edit it to add bed numbers.</p>}
+          </section>
+
+          <section>
             <h3 className="mb-2 flex items-center gap-2 font-bold text-slate-900"><Users size={17} /> Residents</h3>
             {room.residents.length === 0 ? (
               <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-sm text-slate-500">

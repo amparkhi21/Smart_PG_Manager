@@ -6,6 +6,7 @@ import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { findOwned, escapeRegex } from '../utils/ownership.js';
 import { withOccupancyTransaction } from '../utils/occupancyTransaction.js';
+import { validateBedNumbers } from '../utils/residentBeds.js';
 
 export const listRooms = asyncHandler(async (req, res) => {
   const { search, status } = req.query;
@@ -41,7 +42,8 @@ export const getRoom = asyncHandler(async (req, res) => {
 });
 
 export const createRoom = asyncHandler(async (req, res) => {
-  const { roomNumber, floor, roomType, airConditioning, amenities, monthlyRent, capacity, lastMeterReading, notes } = req.body;
+  const { roomNumber, floor, roomType, airConditioning, amenities, monthlyRent, capacity, lastMeterReading, notes, bedNumbers } = req.body;
+  validateBedNumbers(bedNumbers, capacity);
   const room = await Room.create({
     owner: req.owner._id,
     roomNumber,
@@ -51,6 +53,7 @@ export const createRoom = asyncHandler(async (req, res) => {
     amenities,
     monthlyRent,
     capacity,
+    bedNumbers,
     lastMeterReading,
     notes,
   });
@@ -68,8 +71,19 @@ export const updateRoom = asyncHandler(async (req, res) => {
     }
   }
 
+  if (req.body.bedNumbers !== undefined) {
+    const capacity = req.body.capacity ?? room.capacity;
+    validateBedNumbers(req.body.bedNumbers, capacity);
+    const nextBeds = new Set(req.body.bedNumbers.map((value) => value.toLocaleLowerCase()));
+    const assignedResidents = await Resident.find({
+      owner: req.owner._id, room: room._id, status: 'Active', bedNumber: { $type: 'string' },
+    }).select('bedNumber').session(session);
+    const removedBed = assignedResidents.find((resident) => !nextBeds.has(resident.bedNumber.toLocaleLowerCase()));
+    if (removedBed) throw new ApiError(409, `Bed ${removedBed.bedNumber} is assigned to an active resident and cannot be removed`);
+  }
+
   // A rent change only affects residents added and rent generated from now on.
-  ['roomNumber', 'floor', 'roomType', 'airConditioning', 'amenities', 'monthlyRent', 'capacity', 'notes'].forEach((k) => {
+  ['roomNumber', 'floor', 'roomType', 'airConditioning', 'amenities', 'monthlyRent', 'capacity', 'notes', 'bedNumbers'].forEach((k) => {
     if (req.body[k] !== undefined) room[k] = req.body[k];
   });
   await room.save({ session });
@@ -88,9 +102,10 @@ export const deleteRoom = asyncHandler(async (req, res) => {
     throw new ApiError(409, `Room ${room.roomNumber} still has ${active} active resident(s). Move or remove them first.`);
   }
   const anyResident = await Resident.exists(base).session(session);
+  const hasBedHistory = await Resident.exists({ owner: req.owner._id, 'bedAssignments.room': room._id }).session(session);
   const anyRent = await RentRecord.exists(base).session(session);
   const anyBill = await ElectricityBill.exists(base).session(session);
-  if (anyResident || anyRent || anyBill) {
+  if (anyResident || hasBedHistory || anyRent || anyBill) {
     throw new ApiError(409, `Room ${room.roomNumber} has resident, rent or electricity history, so it cannot be deleted.`);
   }
   await room.deleteOne({ session });

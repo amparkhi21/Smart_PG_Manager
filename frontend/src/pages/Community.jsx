@@ -13,6 +13,7 @@ import { COMMUNITY_MESSAGE_LIMIT, communityError, isOwnMessage, messageError } f
 import { formatDateTime } from '../utils/format.js';
 import SharePhoto from '../components/community/SharePhoto.jsx';
 import PrivatePhoto from '../components/community/PrivatePhoto.jsx';
+import CommunityIssues from '../components/community/CommunityIssues.jsx';
 
 function CommunityChat({ user, role, pgId }) {
   const chat = useCommunityMessages(pgId);
@@ -133,5 +134,5 @@ export default function Community() {
   const { owner, resident, role } = useAuth();
   const user = owner || resident;
   const pgId = owner ? owner.id || owner._id : resident.pgId;
-  return <CommunityChat key={`${role}:${user.id || user._id}:${pgId || ''}`} user={user} role={role} pgId={pgId} />;
+  return <div className="space-y-6"><CommunityIssues owner={role === 'owner'} pgId={pgId} /><CommunityChat key={`${role}:${user.id || user._id}:${pgId || ''}`} user={user} role={role} pgId={pgId} /></div>;
 }

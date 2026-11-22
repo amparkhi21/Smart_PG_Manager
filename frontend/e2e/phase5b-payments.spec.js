@@ -10,6 +10,13 @@ async function setup(page, { ownerView = false, upiId = 'owner.name@bank', pendi
     { id: '555555555555555555555555', billType: 'Electricity', month: MONTH, amountDue: 800, amountPaid: 0, balance: 800, dueDate: '2026-11-25T18:29:59Z', status: 'Pending', pendingClaimAmount: 0, pendingClaims: 0, claimableAmount: 800 },
   ];
   const state = { bills, claims: pending ? [newClaim()] : [], upiId, writes: [], conflict };
+  const unified = (claim) => ({ id: `payment:${claim.id}`, sourceType: 'payment', sourceId: claim.id,
+    category: 'Payment Verification', title: `${claim.billType} payment · ${claim.month}`,
+    description: `Claimed ${claim.amount} against ${claim.billType} bill. UTR: ${claim.utr}`, priority: 'Normal',
+    status: claim.status, createdAt: claim.createdAt, ownerResponse: claim.reviewNote || '',
+    resident: { id: resident.id, name: resident.fullName }, room: { number: '101', bedNumber: null },
+    details: { billType: claim.billType, month: claim.month, amount: claim.amount, utr: claim.utr, paymentDate: claim.paymentDate,
+      bill: (() => { const bill = bills.find((item) => item.id === claim.billId); return bill && { amountPaid: bill.amountPaid, balance: bill.balance }; })() } });
   const update = () => { for (const bill of bills) { const pendingClaims = state.claims.filter((claim) => claim.billId === bill.id && claim.status === 'Pending Verification'); bill.pendingClaimAmount = pendingClaims.reduce((sum, claim) => sum + claim.amount, 0); bill.pendingClaims = pendingClaims.length; bill.claimableAmount = bill.balance - bill.pendingClaimAmount; } };
   update();
   await page.clock.setFixedTime(new Date(TODAY + 'T09:00:00Z'));
@@ -20,6 +27,7 @@ async function setup(page, { ownerView = false, upiId = 'owner.name@bank', pendi
     const reply = (data, status = 200, message = 'Saved', extra = {}) => route.fulfill({ status, json: status >= 400 ? { success: false, message: data } : { success: true, data, message, ...extra } });
     if (path === '/auth/session') return reply(isOwner ? { owner: { ...owner, upiId: state.upiId } } : { role: 'resident', resident });
     if (method !== 'GET') state.writes.push({ method, path, body: request.postDataJSON() });
+    if (path === '/residents' && method === 'GET') return reply([]);
     if (path === '/settings') {
       if (method === 'PATCH') state.upiId = request.postDataJSON().upiId;
       return reply({ owner: { ...owner, upiId: state.upiId } }, 200, 'Settings saved');
@@ -35,10 +43,15 @@ async function setup(page, { ownerView = false, upiId = 'owner.name@bank', pendi
       }
       return reply(state.claims);
     }
-    if (path === '/payment-claims') {
-      const filter = url.searchParams.get('status'), type = url.searchParams.get('billType');
-      const counts = Object.fromEntries(['Pending Verification', 'Approved', 'Rejected'].map((status) => [status, state.claims.filter((claim) => claim.status === status).length]));
-      return reply(state.claims.filter((claim) => (!filter || filter === claim.status) && (!type || type === claim.billType)).map((claim) => ({ ...claim, resident: { id: resident.id, name: resident.fullName }, room: '101', bill: bills.find((bill) => bill.id === claim.billId), verificationWarning: 'Check your actual bank/UPI account before approving.' })), 200, 'Loaded', { counts });
+    if ((path === '/requests' || path === '/resident/requests') && method === 'GET') {
+      const status = url.searchParams.get('status'), category = url.searchParams.get('category');
+      const claims = state.claims.filter((claim) => (!status || status === claim.status) && (!category || category === 'Payment Verification')).map(unified);
+      return reply({ requests: claims, pagination: { page: 1, limit: 20, total: claims.length, totalPages: claims.length ? 1 : 0, hasMore: false } });
+    }
+    const detailMatch = path.match(/^(?:\/resident)?\/requests\/payment\/([^/]+)$/);
+    if (detailMatch && method === 'GET') {
+      const claim = state.claims.find((value) => value.id === detailMatch[1]);
+      return claim ? reply(unified(claim)) : reply('Request not found', 404);
     }
     if (path.startsWith('/payment-claims/') && method === 'POST') {
       const claim = state.claims.find((value) => value.id === path.split('/')[2]);
@@ -55,7 +68,7 @@ async function setup(page, { ownerView = false, upiId = 'owner.name@bank', pendi
   });
   return state;
 }
-async function ownerSession(page) { await page.evaluate(() => localStorage.setItem('pg_token', 'owner-token')); await page.goto('/payment-requests'); }
+async function ownerSession(page) { await page.evaluate(() => localStorage.setItem('pg_token', 'owner-token')); await page.goto('/requests'); }
 
 test('resident partial claim stays pending; owner records it only after explicit receipt confirmation', async ({ page }) => {
   const state = await setup(page);
@@ -75,23 +88,28 @@ test('resident partial claim stays pending; owner records it only after explicit
   await expect(dialog.locator('#claim-utr')).toHaveValue(''); expect(state.claims).toHaveLength(0); expect(state.bills[0].balance).toBe(4000);
   await expect(dialog.getByText(/Manual payment: open your UPI app/)).toBeVisible();
   await dialog.locator('#claim-utr').fill('412345678901'); await dialog.locator('#claim-date').fill(TODAY);
+  const claimResponse = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/resident/payments/claims');
   await dialog.getByRole('button', { name: 'Submit payment claim', exact: true }).evaluate((button) => { button.click(); button.click(); });
+  await claimResponse;
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Payment claims', exact: true }).getByText('Pending Verification', { exact: true })).toBeVisible();
-  expect(state.writes.filter((entry) => entry.path === '/resident/payments/claims')).toHaveLength(1); expect(state.bills[0].balance).toBe(4000);
+  await expect.poll(() => state.writes.filter((entry) => entry.path === '/resident/payments/claims').length).toBe(1); expect(state.bills[0].balance).toBe(4000);
   await ownerSession(page);
-  const card = page.getByRole('article', { name: 'Payment request from Resident A', exact: true });
-  await expect(card.getByText('412345678901', { exact: true })).toBeVisible();
-  await card.getByRole('button', { name: 'Approve', exact: true }).click();
-  await expect(dialog.getByRole('button', { name: 'Approve and record payment', exact: true })).toBeDisabled();
+  const card = page.getByRole('article').filter({ hasText: 'Resident A' });
+  await card.getByRole('button', { name: 'Details', exact: true }).click();
+  const requestDialog = page.getByRole('dialog', { name: 'Request details', exact: true });
+  await expect(requestDialog.getByText('412345678901', { exact: true })).toBeVisible();
+  await requestDialog.getByRole('button', { name: 'Approve', exact: true }).click();
+  await expect(requestDialog.getByRole('button', { name: 'Confirm approved', exact: true })).toBeDisabled();
   expect(state.writes.some((entry) => entry.path.endsWith('/approve'))).toBe(false);
-  await dialog.getByRole('checkbox', { name: 'I checked my actual bank/UPI account and received this payment.', exact: true }).check();
-  await dialog.getByRole('button', { name: 'Approve and record payment', exact: true }).evaluate((button) => { button.click(); button.click(); });
-  await expect(page.getByText('No payment requests', { exact: true })).toBeVisible();
-  expect(state.writes.filter((entry) => entry.path.endsWith('/approve'))).toHaveLength(1); expect(state.bills[0].balance).toBe(3749.5);
+  await requestDialog.getByRole('checkbox', { name: 'I verified the actual payment in my bank or UPI account.', exact: true }).check();
+  const approvalResponse = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/payment-claims/666666666666666666666666/approve'));
+  await requestDialog.getByRole('button', { name: 'Confirm approved', exact: true }).evaluate((button) => { button.click(); button.click(); });
+  await approvalResponse;
+  await expect.poll(() => state.writes.filter((entry) => entry.path.endsWith('/approve')).length).toBe(1); expect(state.bills[0].balance).toBe(3749.5);
   expect(state.writes.find((entry) => entry.path.endsWith('/approve')).body.verifiedReceipt).toBe(true);
-  await page.getByLabel('Filter payment requests by status', { exact: true }).selectOption('Approved');
-  await expect(card.getByText('Approved', { exact: true })).toBeVisible(); await expect(card.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0);
+  await expect(card.getByText('Approved', { exact: true })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Details', exact: true })).toBeVisible();
   expect(state.writes.every((entry) => !entry.path.startsWith('/rent/') && !entry.path.startsWith('/electricity/'))).toBe(true);
 });
 
@@ -115,29 +133,39 @@ test('mobile shared-room electricity has no invented share and missing UPI detai
 });
 
 test('owner rejection preserves the bill and a stale approval reports the backend conflict', async ({ page }) => {
-  const state = await setup(page, { ownerView: true, pending: true }); await page.goto('/payment-requests');
-  const card = page.getByRole('article'); await card.getByRole('button', { name: 'Reject', exact: true }).click();
-  const dialog = page.getByRole('dialog'); await dialog.getByLabel('Reason (optional)', { exact: true }).fill('Money not received');
-  await dialog.getByRole('button', { name: 'Confirm rejection', exact: true }).click();
-  await expect(page.getByText('No payment requests', { exact: true })).toBeVisible(); expect(state.bills[0].balance).toBe(4000);
-  await page.getByLabel('Filter payment requests by status', { exact: true }).selectOption('Rejected');
+  const state = await setup(page, { ownerView: true, pending: true }); await page.goto('/requests');
+  const card = page.getByRole('article'); await card.getByRole('button', { name: 'Details', exact: true }).click();
+  let dialog = page.getByRole('dialog', { name: 'Request details', exact: true });
+  await dialog.getByRole('button', { name: 'Reject', exact: true }).click();
+  await dialog.getByLabel('Reply or reason (optional)', { exact: true }).fill('Money not received');
+  const rejectionResponse = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/payment-claims/666666666666666666666666/reject'));
+  await dialog.getByRole('button', { name: 'Confirm rejected', exact: true }).click();
+  await rejectionResponse;
+  await expect.poll(() => state.claims[0].status).toBe('Rejected'); expect(state.bills[0].balance).toBe(4000);
   await expect(card.getByText('Owner response: Money not received', { exact: true })).toBeVisible();
-  state.claims.push({ ...newClaim(), id: '777777777777777777777777' }); state.conflict = true;
-  await page.getByLabel('Filter payment requests by status', { exact: true }).selectOption('Pending Verification');
-  await card.getByRole('button', { name: 'Approve', exact: true }).click();
-  await dialog.getByRole('checkbox').check(); await dialog.getByRole('button', { name: 'Approve and record payment', exact: true }).click();
-  await expect(page.getByRole('alert')).toHaveText('This claim was already approved');
-  await expect(dialog).toHaveCount(0); expect(state.writes.filter((entry) => entry.path.endsWith('/approve'))).toHaveLength(1);
+  state.claims.push({ ...newClaim(), id: '777777777777777777777777', utr: '512345678901' }); state.conflict = true;
+  await page.reload();
+  const conflictCard = page.getByRole('article').nth(1);
+  await conflictCard.getByRole('button', { name: 'Details', exact: true }).click();
+  dialog = page.getByRole('dialog', { name: 'Request details', exact: true });
+  await dialog.getByRole('button', { name: 'Approve', exact: true }).click();
+  await dialog.getByRole('checkbox').check();
+  const conflictResponse = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/payment-claims/777777777777777777777777/approve'));
+  await dialog.getByRole('button', { name: 'Confirm approved', exact: true }).click();
+  await conflictResponse;
+  await expect(dialog.getByRole('alert')).toHaveText('This claim was already approved');
+  await expect(dialog.getByRole('button', { name: 'Confirm approved', exact: true })).toHaveCount(0);
+  await expect.poll(() => state.writes.filter((entry) => entry.path.endsWith('/approve')).length).toBe(1);
 });
 
 test('owner configures a validated UPI ID through existing settings and mobile navigation exposes payment requests', async ({ page }) => {
   const state = await setup(page, { ownerView: true, upiId: '' }); await page.goto('/settings');
   const input = page.getByLabel('Payment UPI ID', { exact: true }); await input.fill('invalid-upi');
   await page.getByRole('button', { name: 'Save settings', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Enter a valid payment UPI ID'); expect(state.writes).toHaveLength(0);
+  await expect(page.getByRole('alert').filter({ hasText: 'Enter a valid payment UPI ID' })).toBeVisible(); expect(state.writes).toHaveLength(0);
   await input.fill('owner.name@bank'); await page.getByRole('button', { name: 'Save settings', exact: true }).click();
   await expect.poll(() => state.upiId).toBe('owner.name@bank');
   expect(state.writes[0].path).toBe('/settings'); expect(state.writes[0].body.rentDueDay).toBe(5); expect(state.bills[0].balance).toBe(4000);
   await page.setViewportSize({ width: 360, height: 800 }); await page.getByRole('button', { name: 'More', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'More', exact: true }).getByRole('link', { name: 'Requests', exact: true })).toHaveAttribute('href', '/payment-requests');
+  await expect(page.getByRole('dialog', { name: 'More', exact: true }).getByRole('link', { name: 'Requests', exact: true })).toHaveAttribute('href', '/requests');
 });

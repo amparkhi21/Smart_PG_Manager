@@ -17,6 +17,7 @@ export default function RoomFormModal({ room, rooms, onClose, onSaved }) {
     amenities: (room?.amenities || []).join(', '),
     monthlyRent: room ? String(room.monthlyRent) : '',
     capacity: room ? String(room.capacity) : '1',
+    bedNumbers: (room?.bedNumbers || []).join(', '),
     lastMeterReading: '',
     notes: room?.notes || '',
   });
@@ -41,6 +42,10 @@ export default function RoomFormModal({ room, rooms, onClose, onSaved }) {
     else if (editing && cap < room.currentResidents) {
       e.capacity = `This room has ${room.currentResidents} active resident(s). Capacity can't be lower.`;
     }
+    const beds = f.bedNumbers.split(',').map((value) => value.trim()).filter(Boolean);
+    if (beds.length > 20 || beds.length > cap) e.bedNumbers = 'Bed count must not exceed room capacity.';
+    else if (beds.some((value) => value.length > 20)) e.bedNumbers = 'Bed numbers can be up to 20 characters.';
+    else if (new Set(beds.map((value) => value.toLocaleLowerCase())).size !== beds.length) e.bedNumbers = 'Bed numbers must be unique within this room.';
     if (!editing && f.lastMeterReading !== '' && Number(f.lastMeterReading) < 0) {
       e.lastMeterReading = 'Meter reading cannot be negative';
     }
@@ -63,6 +68,7 @@ export default function RoomFormModal({ room, rooms, onClose, onSaved }) {
       amenities: [...new Set(f.amenities.split(',').map((value) => value.trim()).filter(Boolean))],
       monthlyRent: Number(f.monthlyRent),
       capacity: Number(f.capacity),
+      bedNumbers: [...new Set(f.bedNumbers.split(',').map((value) => value.trim()).filter(Boolean))],
       notes: f.notes.trim(),
     };
     if (!editing && f.lastMeterReading !== '') payload.lastMeterReading = Number(f.lastMeterReading);
@@ -108,6 +114,9 @@ export default function RoomFormModal({ room, rooms, onClose, onSaved }) {
           </Field>
           <Field label="Capacity (beds)" htmlFor="capacity" error={errors.capacity} hint="How many residents can stay" required>
             <Input id="capacity" name="capacity" type="number" inputMode="numeric" min="1" max="20" step="1" value={f.capacity} onChange={set} invalid={!!errors.capacity} />
+          </Field>
+          <Field label="Bed numbers" htmlFor="bedNumbers" error={errors.bedNumbers} hint="Optional. Separate labels with commas, such as 1A, 1B, 2A.">
+            <Input id="bedNumbers" name="bedNumbers" value={f.bedNumbers} onChange={set} invalid={!!errors.bedNumbers} placeholder="1A, 1B, 2A" />
           </Field>
         </div>
         {!editing && (

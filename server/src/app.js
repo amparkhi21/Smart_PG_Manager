@@ -11,6 +11,8 @@ import roomRoutes from './routes/roomRoutes.js';
 import residentRoutes from './routes/residentRoutes.js';
 import residentPortalRoutes from './routes/residentPortalRoutes.js';
 import paymentClaimRoutes from './routes/paymentClaimRoutes.js';
+import requestsRoutes from './routes/requestsRoutes.js';
+import residentRequestsRoutes from './routes/residentRequestsRoutes.js';
 import roomChangeRoutes from './routes/roomChangeRoutes.js';
 import messMenuRoutes from './routes/messMenuRoutes.js';
 import communityRoutes from './routes/communityRoutes.js';
@@ -81,6 +83,7 @@ export function createApp(env = process.env) {
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/rooms', roomRoutes);
   app.use('/api/residents', residentRoutes);
+  app.use('/api/requests', requestsRoutes);
   app.use('/api/complaints', complaintRoutes);
   app.use('/api/resident/complaints', residentComplaintRoutes);
   app.use('/api/leave-requests', leaveRequestRoutes);
@@ -88,6 +91,7 @@ export function createApp(env = process.env) {
   app.use('/api/emergency-contacts', emergencyContactRoutes);
   app.use('/api/notifications', notificationRoutes);
   app.use('/api/resident/emergency-contacts', residentEmergencyContactRoutes);
+  app.use('/api/resident/requests', residentRequestsRoutes);
   app.use('/api/resident', residentPortalRoutes);
   app.use('/api/payment-claims', paymentClaimRoutes);
   app.use('/api/room-change-requests', roomChangeRoutes);
