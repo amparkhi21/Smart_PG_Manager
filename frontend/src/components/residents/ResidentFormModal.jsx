@@ -6,7 +6,6 @@ import useFetch from '../../hooks/useFetch.js';
 import Modal from '../ui/Modal.jsx';
 import Skeleton from '../ui/Skeleton.jsx';
 import { Field, Input, Select, PasswordInput } from '../ui/FormControls.jsx';
-import PgCode from './PgCode.jsx';
 import { formatCurrency, getErrorMessage, toDateInput, todayInput } from '../../utils/format.js';
 
 const PHONE_RE = /^\+?[0-9]{10,15}$/;
@@ -54,12 +53,14 @@ export default function ResidentFormModal({ resident, onClose, onSaved }) {
   };
 
   const selectedRoom = (rooms || []).find((r) => r._id === f.room);
-  const bedRequired = Boolean(selectedRoom?.bedNumbers?.length && (!editing || f.room !== currentRoomId));
+  const bedRequired = Boolean(selectedRoom);
+  const temporaryPasswordRequired = Boolean(f.loginEnabled && (!resident?.accountStatus || resident.accountStatus === 'unconfigured'));
 
   const validate = () => {
     const e = {};
     if (!f.room) e.room = 'Choose a room';
-    if (bedRequired && !f.bedNumber) e.bedNumber = 'Choose a bed in this room';
+    if (selectedRoom && !selectedRoom.bedNumbers?.length) e.bedNumber = 'Configure bed numbers for this room before assigning a resident';
+    else if (bedRequired && !f.bedNumber) e.bedNumber = 'Choose a bed in this room';
     if (f.bedNumber && selectedRoom) {
       const occupied = (residents || []).some((other) => {
         const otherRoomId = other.room?._id || other.room;
@@ -153,11 +154,11 @@ export default function ResidentFormModal({ resident, onClose, onSaved }) {
           )}
         </Field>
 
-        {selectedRoom?.bedNumbers?.length ? (
-          <Field label="Bed" htmlFor="bedNumber" error={errors.bedNumber} required={bedRequired} hint="Each bed can have one active resident. Availability is checked again when saved.">
-            <Select id="bedNumber" name="bedNumber" value={f.bedNumber} onChange={set} invalid={!!errors.bedNumber} disabled={residentsLoading}>
-              <option value="">{editing && f.room === currentRoomId ? 'Unassigned' : 'Select a bed'}</option>
-              {selectedRoom.bedNumbers.map((bed) => {
+        {selectedRoom ? (
+          <Field label="Bed" htmlFor="bedNumber" error={errors.bedNumber} required hint="Each bed can have one active resident. Availability is checked again when saved.">
+            <Select id="bedNumber" name="bedNumber" value={f.bedNumber} onChange={set} invalid={!!errors.bedNumber} disabled={residentsLoading || !selectedRoom.bedNumbers?.length}>
+              <option value="">{selectedRoom.bedNumbers?.length ? 'Select a bed' : 'Configure beds in Rooms first'}</option>
+              {(selectedRoom.bedNumbers || []).map((bed) => {
                 const occupant = (residents || []).find((other) => {
                   const otherRoomId = other.room?._id || other.room;
                   return other.status === 'Active' && String(otherRoomId) === f.room
@@ -170,8 +171,6 @@ export default function ResidentFormModal({ resident, onClose, onSaved }) {
               })}
             </Select>
           </Field>
-        ) : selectedRoom ? (
-          <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">This room has no configured beds. Add bed numbers in Rooms when ready.</p>
         ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -222,14 +221,13 @@ export default function ResidentFormModal({ resident, onClose, onSaved }) {
 
         <fieldset className="space-y-4 rounded-xl border border-teal-100 bg-teal-50/50 p-4">
           <legend className="px-1 text-sm font-bold text-navy-900">Resident login access</legend>
-          <PgCode />
-          <p className="text-sm text-slate-600">Share this code and your PG name with the resident.</p>
+          <p className="text-sm text-slate-600">Set a one-time temporary password for this resident. They must replace it after signing in.</p>
           <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-semibold text-slate-800">
             <input type="checkbox" checked={f.loginEnabled} onChange={(event) => setF((value) => ({ ...value, loginEnabled: event.target.checked }))} className="h-5 w-5 accent-teal-600" /> Enable resident login
           </label>
-          <Field htmlFor="temporaryPassword" label={resident?.accountStatus && resident.accountStatus !== 'unconfigured' ? 'Reset temporary password' : 'Temporary login password'} error={errors.temporaryPassword}
+          <Field htmlFor="temporaryPassword" label={resident?.accountStatus && resident.accountStatus !== 'unconfigured' ? 'Reset temporary password' : 'Temporary login password'} error={errors.temporaryPassword} required={temporaryPasswordRequired}
             hint={resident?.accountStatus && resident.accountStatus !== 'unconfigured' ? 'Leave blank to keep the password. A reset signs out existing sessions and requires a password change.' : 'Required to activate login. The resident must change this on first login.'}>
-            <PasswordInput id="temporaryPassword" name="temporaryPassword" value={f.temporaryPassword} onChange={set} autoComplete="new-password" invalid={!!errors.temporaryPassword} />
+            <PasswordInput id="temporaryPassword" name="temporaryPassword" value={f.temporaryPassword} onChange={set} autoComplete="new-password" required={temporaryPasswordRequired} invalid={!!errors.temporaryPassword} />
           </Field>
           {editing && <dl className="grid gap-3 text-sm sm:grid-cols-2">
             <div><dt className="text-slate-500">Account status</dt><dd className="font-semibold capitalize">{resident.accountStatus || 'unconfigured'}</dd></div>

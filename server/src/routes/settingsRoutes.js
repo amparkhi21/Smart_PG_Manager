@@ -4,11 +4,6 @@ import { protect } from '../middleware/auth.js';
 import validate from '../middleware/validate.js';
 import { getSettings, updateSettings } from '../controllers/settingsController.js';
 import { validUpiId } from '../utils/upi.js';
-import { validPassword } from '../utils/residentAuth.js';
-import {
-  getPgAccess, setPgJoiningPassword, listActivationInvitations,
-  createActivationInvitation, revokeActivationInvitation,
-} from '../controllers/pgAccessController.js';
 
 const router = Router();
 router.use(protect);
@@ -16,16 +11,6 @@ router.use(protect);
 const templateFields = ['pendingRent', 'overdueRent', 'pendingElectricity', 'overdueElectricity'];
 
 router.get('/', getSettings);
-router.get('/pg-access', getPgAccess);
-router.put('/pg-access/password', body('password').custom(validPassword).withMessage('Use at least 8 characters and at most 72 UTF-8 bytes'), validate, setPgJoiningPassword);
-router.get('/activation-invitations', listActivationInvitations);
-router.post('/activation-invitations', [
-  body('residentId').isMongoId().withMessage('Choose a valid resident'),
-  body('expiresInDays').optional().isInt({ min: 1, max: 30 }).withMessage('Expiry must be between 1 and 30 days').toInt(),
-], validate, createActivationInvitation);
-router.patch('/activation-invitations/revoke', [
-  body('residentId').isMongoId(), body('invitationId').isMongoId(),
-], validate, revokeActivationInvitation);
 router.patch(
   '/',
   [

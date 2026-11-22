@@ -115,7 +115,7 @@ test('Phase 1E resident dashboard and profile use isolated, resident-scoped data
       assert.equal(result.status, 200); assert.equal(result.data.resident.id, String(self._id));
       assert.equal(result.data.resident.email, 'self@phase1e.test');
       assert.equal(result.data.resident.monthlyRent, 5500);
-      assert.equal(result.data.resident.pgCode, `PG-${String(owner._id).toUpperCase()}`);
+      assert.equal(Object.hasOwn(result.data.resident, 'pgCode'), false);
     }
     const foreignDashboard = await request('/resident/dashboard', otherToken);
     assert.equal(foreignDashboard.data.resident.id, String(foreign._id));

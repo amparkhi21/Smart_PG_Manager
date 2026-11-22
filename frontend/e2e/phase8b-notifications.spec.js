@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 const owner = { id: '111111111111111111111111', name: 'Owner A', pgName: 'Test PG', role: 'owner', email: 'owner@example.test' };
-const resident = { id: '222222222222222222222222', fullName: 'Resident A', pgCode: 'PG-' + owner.id.toUpperCase(), pgName: owner.pgName, role: 'resident', room: { id: '333333333333333333333333', roomNumber: '101' }, passwordChangeRequired: false };
+const resident = { id: '222222222222222222222222', fullName: 'Resident A', pgId: owner.id, pgName: owner.pgName, role: 'resident', room: { id: '333333333333333333333333', roomNumber: '101' }, passwordChangeRequired: false };
 const entityId = '444444444444444444444444';
 function notification(index, ownerView = false, extra = {}) {
   return { id: String(index).padStart(24, '0'), pgId: owner.id, recipientRole: ownerView ? 'owner' : 'resident', recipientId: ownerView ? owner.id : resident.id,

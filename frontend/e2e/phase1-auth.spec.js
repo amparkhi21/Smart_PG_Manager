@@ -1,12 +1,13 @@
 import { test, expect } from '@playwright/test';
 
-const owner = { id: '111111111111111111111111', role: 'owner', name: 'Test Owner', email: 'owner@example.test', pgName: 'Test Hostel', pgCode: 'PG-111111111111111111111111', currency: '₹' };
-const room = { _id: '222222222222222222222222', roomNumber: '101', monthlyRent: 5000, capacity: 4, currentResidents: 1, status: 'Occupied' };
-const resident = { id: '333333333333333333333333', fullName: 'Test Resident', role: 'resident', phone: '+919876543210', email: '', room: { id: room._id, roomNumber: '101' }, pgName: owner.pgName, pgCode: owner.pgCode, joiningDate: '2026-01-05', loginEnabled: true, status: 'Active', accountStatus: 'active', firstLoginAt: '2026-11-19T10:00:00.000Z', lastLoginAt: '2026-11-19T10:00:00.000Z', passwordChangeRequired: false };
+const owner = { id: '111111111111111111111111', role: 'owner', name: 'Test Owner', email: 'owner@example.test', pgName: 'Test Hostel', currency: '₹' };
+const room = { _id: '222222222222222222222222', roomNumber: '101', monthlyRent: 5000, capacity: 4, currentResidents: 1, bedNumbers: ['1A', '1B', '1C', '1D'], status: 'Occupied' };
+const resident = { id: '333333333333333333333333', fullName: 'Test Resident', role: 'resident', phone: '+919876543210', email: '', room: { id: room._id, roomNumber: '101' }, pgName: owner.pgName, bedNumber: '1A', pgId: owner.id, joiningDate: '2026-01-05', loginEnabled: true, status: 'Active', accountStatus: 'active', firstLoginAt: '2026-11-19T10:00:00.000Z', lastLoginAt: '2026-11-19T10:00:00.000Z', passwordChangeRequired: false };
 
 async function mockAPI(page, { temporary = false, expired = false, outage = false, loginError = false } = {}) {
-  const state = { resident: { ...resident, passwordChangeRequired: temporary }, expired, outage, writes: [], calls: [],
-    rooms: [room], residents: [{ ...resident, _id: resident.id, room, monthlyRent: 5000, accountStatus: 'unconfigured', loginEnabled: false }],
+  const state = { resident: { ...resident, passwordChangeRequired: temporary }, residentPassword: 'Temporary123!', expired, outage, writes: [], calls: [],
+    rooms: [room], hostels: [{ id: owner.id, pgName: owner.pgName, address: '12 North Road, Jaipur' }],
+    residents: [{ ...resident, _id: resident.id, room, monthlyRent: 5000, accountStatus: 'unconfigured', loginEnabled: false }],
     residentQueries: [], creations: [], portalError: '',
     finance: { month: '2026-11', monthlyRent: 5000, pendingDues: 1250, paymentDueDate: '2026-11-05T18:29:59.000Z',
       currentBill: { amountDue: 5000, amountPaid: 3750, balance: 1250, dueDate: '2026-11-05T18:29:59.000Z', status: 'Partially Paid' } },
@@ -24,10 +25,12 @@ async function mockAPI(page, { temporary = false, expired = false, outage = fals
       return token?.includes('owner-token') ? fulfill({ owner }) : fulfill({ role: 'resident', resident: state.resident });
     }
     if (path === '/auth/login' || path === '/auth/register') return fulfill({ owner, token: 'owner-token' });
-    if (path === '/auth/resident/login') return loginError ? fulfill('Invalid resident credentials', 401) : fulfill({ role: 'resident', resident: state.resident, token: 'resident-token' });
-    if (path === '/auth/resident/join/verify') return fulfill({ challenge: 'temporary-join-challenge' });
-    if (path === '/auth/resident/join/activate') return fulfill({ role: 'resident', resident: state.resident, token: 'resident-joined-token' });
+    if (path === '/auth/resident/hostels') return fulfill({ hostels: state.hostels });
+    if (path === '/auth/resident/login') return loginError || req.postDataJSON().password !== state.residentPassword
+      ? fulfill('Invalid resident details. Check your hostel, room, bed and password.', 401)
+      : fulfill({ role: 'resident', resident: state.resident, token: 'resident-token' });
     if (path === '/auth/resident/change-password') {
+      state.residentPassword = req.postDataJSON().newPassword;
       state.resident.passwordChangeRequired = false;
       return fulfill({ role: 'resident', resident: state.resident, token: 'resident-token-changed' });
     }
@@ -69,14 +72,17 @@ async function seedToken(page, token) {
   await page.addInitScript((value) => localStorage.setItem('pg_token', value), token);
 }
 
-async function residentLogin(page) {
+async function residentLogin(page, password = 'Temporary123!') {
   await page.goto('/resident/login', {
     waitUntil: 'domcontentloaded'
   });
 
   await page.getByLabel('Hostel / PG Name', { exact: true }).fill('Test Hostel');
-  await page.getByLabel('Phone Number', { exact: true }).fill('9876543210');
-  await page.getByLabel('Password', { exact: true }).fill('Temporary123!');
+  await page.getByLabel('Hostel / PG Name', { exact: true }).press('Tab');
+  await expect(page.getByRole('button', { name: 'Log in', exact: true })).toBeEnabled();
+  await page.getByLabel('Room Number', { exact: true }).fill('101');
+  await page.getByLabel('Bed Number', { exact: true }).fill('1A');
+  await page.getByLabel('Resident Password', { exact: true }).fill(password);
 
   await Promise.all([
     page.waitForResponse(response =>
@@ -87,24 +93,34 @@ async function residentLogin(page) {
   ]);
 }
 
-test('first-time PG joining begins with four details, verifies an invitation, and creates a resident session', async ({ page }) => {
+test('owner-provisioned resident login uses hostel, room, bed and individual password', async ({ page }) => {
   const state = await mockAPI(page);
-  await page.goto('/resident/join', { waitUntil: 'domcontentloaded' });
-  const initialForm = page.locator('form').first();
-  await expect(initialForm.locator('input')).toHaveCount(4);
+  await residentLogin(page);
+  await expect(page).toHaveURL(/\/resident\/dashboard$/);
+  expect(await storedToken(page)).toBe('resident-token');
+  expect(state.calls).toContain('/auth/resident/hostels');
+  expect(state.calls).toContain('/auth/resident/login');
+  await expect(page.getByText(/activation code|joining password|PG code/i)).toHaveCount(0);
+});
+
+test('duplicate hostel names are selected by address while the internal ID stays hidden', async ({ page }) => {
+  const state = await mockAPI(page);
+  state.hostels.push({ id: '999999999999999999999999', pgName: owner.pgName, address: '44 Lake Street, Jaipur' });
+  await page.goto('/resident/login', { waitUntil: 'domcontentloaded' });
   await page.getByLabel('Hostel / PG Name', { exact: true }).fill('Test Hostel');
-  await page.getByLabel('PG Joining Password', { exact: true }).fill('JoiningPass123!');
+  await page.getByLabel('Hostel / PG Name', { exact: true }).press('Tab');
+  const locations = page.getByLabel('Choose hostel location', { exact: true });
+  await expect(locations).toBeVisible();
+  await expect(locations).toContainText('12 North Road, Jaipur');
+  await expect(locations).toContainText('44 Lake Street, Jaipur');
+  await locations.selectOption('999999999999999999999999');
   await page.getByLabel('Room Number', { exact: true }).fill('101');
   await page.getByLabel('Bed Number', { exact: true }).fill('1A');
-  await page.getByRole('button', { name: 'Verify PG and bed' }).click();
-  await page.getByLabel('Activation code', { exact: true }).fill('single-use-code-from-owner');
-  await page.getByLabel('Create personal password', { exact: true }).fill('PersonalPass123!');
-  await page.getByLabel('Confirm personal password', { exact: true }).fill('PersonalPass123!');
-  await page.getByRole('button', { name: 'Set password and join' }).click();
-  await expect(page).toHaveURL(/\/resident\/dashboard$/);
-  expect(await storedToken(page)).toBe('resident-joined-token');
-  expect(state.calls).toContain('/auth/resident/join/verify');
-  expect(state.calls).toContain('/auth/resident/join/activate');
+  await page.getByLabel('Resident Password', { exact: true }).fill('Temporary123!');
+  const response = page.waitForRequest((request) => request.url().endsWith('/api/auth/resident/login'));
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  expect((await response).postDataJSON()).toMatchObject({ ownerId: '999999999999999999999999', pgName: 'Test Hostel', roomNumber: '101', bedNumber: '1A' });
+  expect((await response).postData()).not.toMatch(/PG code|PG-/i);
 });
 
 test('role picker, Change Role, accessible password visibility and mobile widths', async ({ page }, testInfo) => {
@@ -140,11 +156,11 @@ for (const width of [360, 768, 1280]) {
   await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
   await page.getByRole('link', { name: 'Change Role' }).click();
   await page.getByRole('link', { name: "I'm a Resident / Student" }).click();
-  await page.getByLabel('Password', { exact: true }).fill('Temporary123!');
+  await page.getByLabel('Resident Password', { exact: true }).fill('Temporary123!');
   await page.getByRole('button', { name: 'Show password' }).click();
-  await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'text');
+  await expect(page.getByLabel('Resident Password', { exact: true })).toHaveAttribute('type', 'text');
   await page.getByRole('button', { name: 'Hide password' }).click();
-  await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'password');
+  await expect(page.getByLabel('Resident Password', { exact: true })).toHaveAttribute('type', 'password');
   await expect(page.getByRole('link', { name: 'Create an account' })).toHaveCount(0);
 });
 
@@ -187,6 +203,8 @@ test('first login is enforced across routes and refresh, then the new session pe
   await expect(page).toHaveURL(/\/resident\/login$/); expect(await storedToken(page)).toBeNull();
   await page.goBack();
   await expect(page.getByRole('heading', { name: 'Welcome, Test Resident' })).toHaveCount(0);
+  await residentLogin(page, 'Personal456!');
+  await expect(page).toHaveURL(/\/resident\/dashboard$/);
 });
 
 test('resident sessions cannot open owner pages and profile uses authenticated data only', async ({ page }) => {
@@ -236,14 +254,14 @@ test('expired sessions clear tokens, while a transient outage preserves the save
   expect(await storedToken(page)).toBeNull();
 });
 
-test('resident login failures show an error and permit a retry', async ({ page }) => {
+test('resident login failures show a generic error and permit a retry', async ({ page }) => {
   await mockAPI(page, { loginError: true });
   await residentLogin(page);
-  await expect(page.getByRole('alert')).toHaveText('Invalid resident credentials');
+  await expect(page.getByRole('alert')).toHaveText('Invalid resident details. Check your hostel, room, bed and password.');
   await expect(page.getByRole('button', { name: 'Log in', exact: true })).toBeEnabled();
 });
 
-test('owner resident account filters combine with search and room; PG code copies on desktop and mobile', async ({ page }) => {
+test('owner resident filters work without exposing PG codes on desktop or mobile', async ({ page }) => {
   const state = await mockAPI(page);
   const secondRoom = { ...room, _id: '555555555555555555555555', roomNumber: '202' };
   state.rooms.push(secondRoom);
@@ -254,18 +272,11 @@ test('owner resident account filters combine with search and room; PG code copie
   );
   // This is a legacy record with no authentication fields yet.
   delete state.residents[0].accountStatus;
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
-      async writeText(text) { window.copiedPgCode = text; },
-    } });
-  });
   await seedToken(page, 'owner-token'); await page.goto('/residents');
   const heading = page.getByRole('heading', { name: 'Residents', exact: true });
   await expect(heading).toBeVisible();
-  await expect(page.getByText(owner.pgCode, { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Copy PG code', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.copiedPgCode)).toBe(owner.pgCode);
-  await expect(page.getByText('PG code copied', { exact: true })).toBeVisible();
+  await expect(page.getByText(/PG code/i)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Copy PG code/i })).toHaveCount(0);
   const accountFilter = page.getByLabel('Filter by account status', { exact: true });
   await accountFilter.selectOption('unconfigured');
   await expect(page.getByText('Test Resident', { exact: true }).first()).toBeVisible();
@@ -289,10 +300,7 @@ test('owner resident account filters combine with search and room; PG code copie
   await expect(page.locator('tbody').getByText('Login disabled', { exact: true })).toBeVisible();
   await page.setViewportSize({ width: 360, height: 800 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await page.evaluate(() => { navigator.clipboard.writeText = async () => { throw new Error('Clipboard denied'); }; });
-  await page.getByRole('button', { name: 'Copy PG code', exact: true }).click();
-  await expect(page.getByText('Could not access the clipboard. Select and copy the PG code manually.', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Copy PG code', exact: true })).toBeEnabled();
+  await expect(page.getByText(/PG code/i)).toHaveCount(0);
 });
 
 test('owner resident accounts can be added, reset, disabled and re-enabled through existing forms', async ({ page }) => {
@@ -301,8 +309,8 @@ test('owner resident accounts can be added, reset, disabled and re-enabled throu
   await seedToken(page, 'owner-token'); await page.goto('/residents');
   await page.getByRole('button', { name: 'Add resident', exact: true }).click();
   const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('button', { name: 'Copy PG code', exact: true })).toBeVisible();
   await dialog.getByLabel('Room', { exact: true }).selectOption(room._id);
+  await dialog.getByLabel('Bed', { exact: true }).selectOption('1B');
   await dialog.getByLabel('Full name', { exact: true }).fill('New Resident');
   await dialog.getByLabel('Phone number', { exact: true }).fill('9876543211');
   await dialog.getByLabel('Email', { exact: true }).fill('new@example.test');
@@ -310,7 +318,7 @@ test('owner resident accounts can be added, reset, disabled and re-enabled throu
   await dialog.getByLabel('Temporary login password', { exact: true }).fill('Temporary123!');
   await dialog.getByRole('button', { name: 'Add resident', exact: true }).click();
   await expect.poll(() => state.creations.length).toBe(1);
-  expect(state.creations[0]).toMatchObject({ fullName: 'New Resident', phone: '9876543211', email: 'new@example.test', room: room._id, loginEnabled: true, temporaryPassword: 'Temporary123!', monthlyRent: 5000 });
+  expect(state.creations[0]).toMatchObject({ fullName: 'New Resident', phone: '9876543211', email: 'new@example.test', room: room._id, bedNumber: '1B', loginEnabled: true, temporaryPassword: 'Temporary123!', monthlyRent: 5000 });
   await expect(dialog).toHaveCount(0);
   await page.getByRole('button', { name: 'Edit Test Resident', exact: true }).click();
   await expect(dialog.getByText('First login', { exact: true })).toBeVisible();
