@@ -75,7 +75,7 @@ test('Phase 2A resident room information and vacancy on disposable MongoDB', { t
     assert.equal(result.status, 200); assertPrivate(result);
     assert.deepEqual(result.data.room, {
       id: String(assigned._id), roomNumber: '101', floor: '1', roomType: 'Shared', airConditioning: 'AC', amenities: ['Wi-Fi', 'Wardrobe'],
-      monthlyRent: 5000, assignedMonthlyRent: 4200, capacity: 3, occupiedBeds: 2, availableBeds: 1, status: 'Partially Occupied',
+      monthlyRent: 5000, assignedMonthlyRent: 4200, capacity: 3, occupiedBeds: 2, availableBeds: 1, beds: [], bedNumber: null, status: 'Partially Occupied',
     });
   });
   await t.test('availability includes only this PG, counts disabled logins, excludes left residents and handles legacy metadata', async () => {

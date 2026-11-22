@@ -21,7 +21,7 @@ test('notification records must match both recipient and PG, including the accou
   for (const extra of [{ recipientId: owner.id }, { pgId: entityId }, { recipientRole: 'owner' }]) assert.equal(belongsToNotificationAccount(item(extra), identity), false);
 });
 test('only exact type-specific application paths and valid entity IDs can be opened', () => {
-  assert.equal(notificationTarget(item(), 'resident').kind, 'complaint');
+  assert.equal(notificationTarget(item(), 'resident').kind, 'complaint'); assert.equal(notificationTarget(item(), 'resident').path, '/resident/requests');
   for (const path of ['https://evil.test', '//evil.test', '/resident/complaints?next=evil', '/resident/complaints#x', '/resident/complaints/', '/resident/%63omplaints', '/complaints', '/resident/payments', '/resident/../complaints', 'javascript:alert(1)', '\\evil.test', null]) assert.equal(notificationTarget(item({ path }), 'resident'), null);
   assert.equal(notificationTarget(item(), 'owner'), null);
   assert.equal(notificationTarget(item({ relatedEntityId: '../anything' }), 'resident'), null);
@@ -29,7 +29,7 @@ test('only exact type-specific application paths and valid entity IDs can be ope
 });
 test('every backend notification type maps to the permitted owner or resident module', () => {
   const groups = [
-    ['owner', '/complaints', ['complaint_created']], ['resident', '/resident/complaints', ['complaint_status_updated', 'complaint_response']],
+    ['owner', '/requests', ['complaint_created']], ['resident', '/resident/requests', ['complaint_status_updated', 'complaint_response']],
     ['owner', '/room-change-requests', ['room_change_requested']], ['resident', '/resident/room-change-requests', ['room_change_approved', 'room_change_rejected']],
     ['owner', '/leave-requests', ['leave_requested']], ['resident', '/resident/leave-requests', ['leave_approved', 'leave_rejected']],
     ['owner', '/payment-requests', ['payment_claim_submitted']], ['resident', '/resident/payments', ['payment_approved', 'payment_rejected', 'rent_due', 'bill_due']],
@@ -52,7 +52,7 @@ test('complaint and leave links use existing role-scoped detail APIs', async () 
   const calls = [], api = { get: async (path) => { calls.push(path); return { data: { data: { id: entityId } } }; } };
   await fetchNotificationRecord(api, item(), 'resident');
   await fetchNotificationRecord(api, item({ type: 'leave_requested', path: '/leave-requests' }), 'owner');
-  assert.deepEqual(calls, [`/resident/complaints/${entityId}`, `/leave-requests/${entityId}`]);
+  assert.deepEqual(calls, [`/resident/requests/complaint/${entityId}`, `/leave-requests/${entityId}`]);
   await assert.rejects(fetchNotificationRecord(api, item({ path: '/settings' }), 'resident'), /available application link/); assert.equal(calls.length, 2);
 });
 test('room, payment and notice links use only supported list APIs and reject unavailable records', async () => {

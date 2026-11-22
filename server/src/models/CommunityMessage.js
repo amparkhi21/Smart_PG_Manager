@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 
 export const MESSAGE_MAX_LENGTH = 2000;
+export const COMMUNITY_ISSUE_CATEGORIES = ['General Discussion', 'Water Problem', 'Electricity Problem', 'Wi-Fi Problem', 'Cleaning / Maintenance', 'Food / Mess', 'Other Hostel Issue'];
+export const COMMUNITY_ISSUE_STATUSES = ['Open', 'In Progress', 'Resolved'];
 
 const communityMessageSchema = new mongoose.Schema({
   // The existing owner record identifies the private PG community.
@@ -12,8 +14,14 @@ const communityMessageSchema = new mongoose.Schema({
   image: { type: new mongoose.Schema({ fileId: { type: mongoose.Schema.Types.ObjectId, required: true },
     contentType: { type: String, enum: ['image/jpeg', 'image/png', 'image/webp'], required: true },
     size: { type: Number, min: 1, max: 5 * 1024 * 1024, required: true } }, { _id: false }), default: undefined },
-  kind: { type: String, enum: ['message', 'announcement'], default: 'message' },
+  kind: { type: String, enum: ['message', 'announcement', 'issue', 'issue-comment'], default: 'message' },
+  title: { type: String, trim: true, maxlength: 120, required() { return this.kind === 'issue'; } },
+  category: { type: String, enum: COMMUNITY_ISSUE_CATEGORIES, required() { return this.kind === 'issue'; } },
+  status: { type: String, enum: COMMUNITY_ISSUE_STATUSES, default: 'Open' },
+  roomNumber: { type: String, trim: true, maxlength: 20, default: null },
+  parentIssue: { type: mongoose.Schema.Types.ObjectId, ref: 'CommunityMessage', index: true },
 }, { timestamps: true });
 
 communityMessageSchema.index({ owner: 1, createdAt: -1, _id: -1 });
+communityMessageSchema.index({ owner: 1, kind: 1, category: 1, status: 1, createdAt: -1, _id: -1 });
 export default mongoose.model('CommunityMessage', communityMessageSchema);

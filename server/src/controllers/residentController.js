@@ -10,6 +10,7 @@ import { refreshOverdue, round2 } from '../utils/billing.js';
 import { currentMonthIST } from '../utils/dates.js';
 import { applyLoginAccess } from '../utils/residentAuth.js';
 import { withOccupancyTransaction } from '../utils/occupancyTransaction.js';
+import { assertBedAvailable, resolveBedNumber, setResidentBed } from '../utils/residentBeds.js';
 
 async function assertCapacity(ownerId, room, excludeResidentId, session) {
   const filter = { owner: ownerId, room: room._id, status: 'Active' };
@@ -67,6 +68,8 @@ export const createResident = asyncHandler(async (req, res) => {
   const { resident, room } = await withOccupancyTransaction(req.owner._id, async (session) => {
   const room = await findOwned(Room, req.body.room, req, undefined, session);
   await assertCapacity(req.owner._id, room, undefined, session);
+  const bedNumber = resolveBedNumber(room, req.body.bedNumber, { required: Boolean(room.bedNumbers?.length) });
+  await assertBedAvailable(req.owner._id, room, bedNumber, undefined, session);
 
   const resident = new Resident({
     owner: req.owner._id,
@@ -78,6 +81,7 @@ export const createResident = asyncHandler(async (req, res) => {
     monthlyRent: monthlyRent ?? room.monthlyRent, // defaults to the room's rent
     emergencyContact,
   });
+  if (bedNumber) setResidentBed(resident, null, room, bedNumber);
   await applyLoginAccess(resident, req.body);
   await resident.save({ session });
   return { resident, room };
@@ -90,10 +94,19 @@ export const updateResident = asyncHandler(async (req, res) => {
   const resident = await findOwned(Resident, req.params.id, req, undefined, session);
   if (resident.status === 'Left') throw new ApiError(409, 'This resident has left and can no longer be edited');
 
-  if (req.body.room && String(req.body.room) !== String(resident.room)) {
+  const roomChanged = req.body.room && String(req.body.room) !== String(resident.room);
+  if (roomChanged) {
     const newRoom = await findOwned(Room, req.body.room, req, undefined, session);
     await assertCapacity(req.owner._id, newRoom, resident._id, session);
-    resident.room = newRoom._id; // old rent records keep their original room
+  }
+  if (roomChanged || req.body.bedNumber !== undefined) {
+    const previousRoom = await findOwned(Room, resident.room, req, undefined, session);
+    const nextRoom = roomChanged ? await findOwned(Room, req.body.room, req, undefined, session) : previousRoom;
+    const bedNumber = resolveBedNumber(nextRoom, req.body.bedNumber, {
+      required: Boolean(roomChanged && nextRoom.bedNumbers?.length),
+    });
+    await assertBedAvailable(req.owner._id, nextRoom, bedNumber, resident._id, session);
+    setResidentBed(resident, previousRoom, nextRoom, bedNumber);
   }
   ['fullName', 'phone', 'email', 'joiningDate', 'monthlyRent', 'emergencyContact'].forEach((k) => {
     if (req.body[k] !== undefined) resident[k] = req.body[k];
@@ -107,12 +120,16 @@ export const updateResident = asyncHandler(async (req, res) => {
 
 // Marks the resident as Left. All history (rent, attendance) is kept.
 export const markResidentLeft = asyncHandler(async (req, res) => {
-  const resident = await findOwned(Resident, req.params.id, req);
-  if (resident.status === 'Left') throw new ApiError(409, 'Resident is already marked as left');
-
-  resident.status = 'Left';
-  resident.leftDate = req.body.leftDate || new Date();
-  await resident.save();
+  const resident = await withOccupancyTransaction(req.owner._id, async (session) => {
+    const resident = await findOwned(Resident, req.params.id, req, undefined, session);
+    if (resident.status === 'Left') throw new ApiError(409, 'Resident is already marked as left');
+    const room = resident.bedNumber ? await findOwned(Room, resident.room, req, undefined, session) : null;
+    if (room) setResidentBed(resident, room, room, undefined);
+    resident.status = 'Left';
+    resident.leftDate = req.body.leftDate || new Date();
+    await resident.save({ session });
+    return resident;
+  });
 
   const unpaid = await RentRecord.find({ owner: req.owner._id, resident: resident._id, balance: { $gt: 0 } });
   const pendingRent = round2(unpaid.reduce((s, r) => s + r.balance, 0));
@@ -125,12 +142,17 @@ export const markResidentLeft = asyncHandler(async (req, res) => {
 
 // Hard delete is only allowed for residents with no history (e.g. added by mistake)
 export const deleteResident = asyncHandler(async (req, res) => {
-  const resident = await findOwned(Resident, req.params.id, req);
-  const base = { owner: req.owner._id, resident: resident._id };
-  const [hasRent, hasAttendance] = await Promise.all([RentRecord.exists(base), Attendance.exists(base)]);
-  if (hasRent || hasAttendance) {
-    throw new ApiError(409, 'This resident has rent or attendance history. Mark them as left instead of deleting.');
-  }
-  await resident.deleteOne();
+  await withOccupancyTransaction(req.owner._id, async (session) => {
+    const resident = await findOwned(Resident, req.params.id, req, undefined, session);
+    const base = { owner: req.owner._id, resident: resident._id };
+    const [hasRent, hasAttendance, hasInvitations] = await Promise.all([
+      RentRecord.exists(base).session(session), Attendance.exists(base).session(session),
+      Resident.exists({ _id: resident._id, 'activationInvitations.0': { $exists: true } }).session(session),
+    ]);
+    if (hasRent || hasAttendance || resident.bedAssignments?.length || hasInvitations) {
+      throw new ApiError(409, 'This resident has room, activation, rent or attendance history. Mark them as left instead of deleting.');
+    }
+    await resident.deleteOne({ session });
+  });
   res.json({ success: true, message: 'Resident deleted' });
 });

@@ -3,8 +3,9 @@ import { body, param, query } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import { protect, protectResident, verifySession } from '../middleware/auth.js';
 import validate from '../middleware/validate.js';
-import { MESSAGE_MAX_LENGTH } from '../models/CommunityMessage.js';
-import { listCommunityMessages, createCommunityMessage, deleteCommunityMessage } from '../controllers/communityController.js';
+import { MESSAGE_MAX_LENGTH, COMMUNITY_ISSUE_CATEGORIES, COMMUNITY_ISSUE_STATUSES } from '../models/CommunityMessage.js';
+import { listCommunityMessages, createCommunityMessage, deleteCommunityMessage, listCommunityIssues, createCommunityIssue,
+  getCommunityIssue, addCommunityIssueComment, updateCommunityIssueStatus, deleteCommunityIssue } from '../controllers/communityController.js';
 import { IMAGE_MAX_BYTES } from '../utils/communityImages.js';
 import { shareCommunityImage, getCommunityImage } from '../controllers/communityImageController.js';
 import { listNotices, createNotice, updateNotice, deleteNotice, markNoticesRead } from '../controllers/noticeController.js';
@@ -37,7 +38,19 @@ router.post('/messages', postLimiter, [
   body('kind').optional().isString().bail().isIn(['message', 'announcement']),
 ], validate, createCommunityMessage);
 router.delete('/messages/:id', param('id').isString().bail().isMongoId(), validate, deleteCommunityMessage);
-router.post('/images', postLimiter, express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: IMAGE_MAX_BYTES, inflate: false }), shareCommunityImage);
+router.get('/issues', [
+  query('page').optional().isInt({ min: 1, max: 1000 }), query('limit').optional().isInt({ min: 1, max: 100 }),
+  query('category').optional().isString().bail().isIn(COMMUNITY_ISSUE_CATEGORIES), query('status').optional().isString().bail().isIn(COMMUNITY_ISSUE_STATUSES),
+], validate, listCommunityIssues);
+router.post('/issues', postLimiter, [
+  body('category').isString().bail().isIn(COMMUNITY_ISSUE_CATEGORIES), body('title').isString().bail().trim().isLength({ min: 3, max: 120 }),
+  body('description').isString().bail().trim().isLength({ min: 5, max: MESSAGE_MAX_LENGTH }),
+], validate, createCommunityIssue);
+router.get('/issues/:id', param('id').isMongoId(), validate, getCommunityIssue);
+router.post('/issues/:id/comments', postLimiter, [param('id').isMongoId(), body('text').isString().bail().trim().isLength({ min: 1, max: MESSAGE_MAX_LENGTH })], validate, addCommunityIssueComment);
+router.patch('/issues/:id/status', postLimiter, [param('id').isMongoId(), body('status').isString().bail().isIn(COMMUNITY_ISSUE_STATUSES)], validate, updateCommunityIssueStatus);
+router.delete('/issues/:id', postLimiter, param('id').isMongoId(), validate, deleteCommunityIssue);
+router.post('/images', postLimiter, query('issueId').optional().isMongoId(), validate, express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: IMAGE_MAX_BYTES, inflate: false }), shareCommunityImage);
 router.get('/images/:id', param('id').isString().bail().isMongoId(), validate, getCommunityImage);
 
 const noticeRules = (partial = false) => [

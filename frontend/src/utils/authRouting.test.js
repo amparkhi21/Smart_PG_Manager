@@ -20,7 +20,7 @@ test('Android back handles resident roots, deep links and owner aliases', () => 
   assert.equal(backAction('/owner/register', 0), 'owner-login');
 });
 test('future resident modules have no interactive route until implemented', () => {
-  assert.equal(RESIDENT_NAV.length, 15);
-  assert.deepEqual(RESIDENT_NAV.filter((item) => item.to).map((item) => item.label), ['Dashboard', 'My Room', 'Room Availability', 'Room Change Requests', 'Mess Menu', 'Community', 'My Bills & Payments', 'My Complaints', 'Notice Board', 'Leave Requests', 'Emergency Contacts', 'Notifications', 'My Profile', 'Settings']);
+  assert.equal(RESIDENT_NAV.length, 13);
+  assert.deepEqual(RESIDENT_NAV.filter((item) => item.to).map((item) => item.label), ['Dashboard', 'My Room', 'Room Availability', 'My Requests', 'Mess Menu', 'Community', 'My Bills & Payments', 'Notice Board', 'Emergency Contacts', 'Notifications', 'My Profile', 'Settings']);
   assert.equal(RESIDENT_NAV.filter((item) => !item.to).length, 1);
 });

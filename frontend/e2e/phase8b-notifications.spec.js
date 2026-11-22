@@ -9,10 +9,13 @@ function notification(index, ownerView = false, extra = {}) {
     title: 'Update ' + index, message: 'A private account update ' + index, createdAt: new Date(Date.UTC(2026, 10, 21, 8, index)).toISOString(), read: false, readAt: null, ...extra };
 }
 async function setup(page, extra = {}) {
-  const state = { ownerView: false, rows: [], writes: [], reads: [], countReads: 0, failList: false, failCount: false, failWrite: false, expired: false, bypassScope: false, missing: false, ...extra };
+  const complaint = { id: `complaint:${entityId}`, sourceType: 'complaint', sourceId: entityId, pgId: owner.id, category: 'Private Issue', title: 'Bathroom repair', description: 'The bathroom lock needs attention.', priority: 'High', status: 'Open', createdAt: '2026-11-21T08:00:00Z', ownerResponse: '',
+    resident: { id: resident.id, name: resident.fullName }, room: { id: resident.room.id, number: '101', bedNumber: null }, details: { originalCategory: 'Maintenance' },
+    responses: [{ ownerName: resident.fullName, actorRole: 'resident', type: 'Comment', message: 'The existing private history remains visible.', createdAt: '2026-11-21T08:05:00Z' }] };
+  const state = { ownerView: false, rows: [], writes: [], requestWrites: [], reads: [], complaint, countReads: 0, failList: false, failCount: false, failWrite: false, expired: false, bypassScope: false, missing: false, ...extra };
   await page.addInitScript((token) => localStorage.setItem('pg_token', token), state.ownerView ? 'owner-token' : 'resident-token');
   await page.route((url) => url.origin === 'http://127.0.0.1:4179' && url.pathname.startsWith('/api/'), async (route) => {
-    const req = route.request(), url = new URL(req.url()), path = url.pathname.slice(4), method = req.method();
+    const req = route.request(), url = new URL(req.url()), path = url.pathname.slice(4), method = req.method(), isOwner = req.headers().authorization === 'Bearer owner-token';
     const reply = (data, status = 200) => route.fulfill({ status, json: status >= 400 ? { success: false, message: data } : { success: true, data, message: 'Updated' } });
     if (state.expired) return reply('Your session has expired. Please log in again', 401);
     if (path === '/auth/session') return reply(state.ownerView ? { owner } : { role: 'resident', resident });
@@ -32,9 +35,21 @@ async function setup(page, extra = {}) {
       if (!row) return reply('Notification not found', 404);
       row.read = true; row.readAt ||= new Date().toISOString(); return reply(row);
     }
-    const base = state.ownerView ? '/complaints' : '/resident/complaints';
-    if (path === `${base}/${entityId}`) return state.missing ? reply('Complaint not found', 404) : reply({ id: entityId, pgId: owner.id, title: 'Bathroom repair', description: 'The bathroom lock needs attention.', category: 'Maintenance', priority: 'High', status: 'Open', resident: { id: resident.id, fullName: resident.fullName, roomNumberAtCreation: '101' }, room: resident.room, createdAt: '2026-11-21T08:00:00Z' });
-    if (path === `${base}/${entityId}/history`) return reply({ events: [], pagination: { page: 1, totalPages: 0, hasMore: false, total: 0, limit: 20 } });
+    if (path === `/requests/complaint/${entityId}` && method === 'GET') {
+      if (!state.ownerView || !isOwner || state.complaint.pgId !== owner.id || state.missing) return reply('Complaint not found', 404);
+      return reply(state.complaint);
+    }
+    if (path === `/complaints/${entityId}/comments` && method === 'POST') {
+      if (!state.ownerView || !isOwner || state.complaint.pgId !== owner.id) return reply('Complaint not found', 404);
+      const body = req.postDataJSON(); state.requestWrites.push({ method, path, body });
+      state.complaint.responses.push({ ownerName: owner.name, actorRole: 'owner', type: 'Comment', message: body.text, createdAt: '2026-11-21T08:10:00Z' });
+      return reply(state.complaint);
+    }
+    if (path === `/complaints/${entityId}/status` && method === 'PATCH') {
+      if (!state.ownerView || !isOwner || state.complaint.pgId !== owner.id) return reply('Complaint not found', 404);
+      const body = req.postDataJSON(); state.requestWrites.push({ method, path, body }); state.complaint.status = body.status;
+      return reply(state.complaint);
+    }
     if (path === '/community/notices') return reply({ pgId: owner.id, notices: state.missing ? [] : [{ id: entityId, title: 'Water supply update', body: 'Water supply resumes at noon.', pinned: false, isNew: false, isExpired: false, createdAt: '2026-11-21T08:00:00Z', updatedAt: '2026-11-21T08:00:00Z', expiresAt: null }], readThrough: '2026-11-21T08:00:00Z' });
     return reply('Unexpected endpoint ' + path, 404);
   });
@@ -78,10 +93,20 @@ test('resident mobile bell opens a real notice, validates its module link and su
 test('owner notification opens the existing private complaint details and response controls', async ({ page }) => {
   const state = await setup(page, { ownerView: true, rows: [notification(1, true)] }); await page.goto('/notifications');
   await page.getByRole('button', { name: 'Update 1', exact: true }).click();
-  const dialog = page.getByRole('dialog'); await expect(dialog.getByText('Bathroom repair', { exact: true })).toBeVisible(); await expect(dialog.getByLabel('Owner response', { exact: true })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Send response', exact: true })).toBeDisabled();
-  expect(state.reads.some((read) => read.path === '/complaints/' + entityId)).toBe(true); expect(state.reads.some((read) => read.path.startsWith('/resident/complaints'))).toBe(false);
-  await dialog.getByRole('button', { name: 'Close', exact: true }).click(); await expect(page.getByLabel(/\d+ unread notifications/)).toHaveCount(0);
+  const dialog = page.getByRole('dialog', { name: 'Request details', exact: true });
+  await expect(dialog.getByRole('heading', { name: 'Bathroom repair', exact: true })).toBeVisible();
+  await expect(dialog.locator('li').filter({ hasText: 'The existing private history remains visible.' })).toBeVisible();
+  const reply = dialog.getByLabel('Private reply', { exact: true }); await expect(reply).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Save private update', exact: true })).toBeDisabled();
+  await reply.fill('The repair is scheduled for tomorrow.');
+  await expect(dialog.getByRole('button', { name: 'Save private update', exact: true })).toBeEnabled();
+  const responseRequest = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname === `/api/complaints/${entityId}/comments`);
+  await dialog.getByRole('button', { name: 'Save private update', exact: true }).click(); await responseRequest;
+  await expect.poll(() => state.requestWrites.length).toBe(1);
+  expect(state.requestWrites[0]).toEqual({ method: 'POST', path: `/complaints/${entityId}/comments`, body: { text: 'The repair is scheduled for tomorrow.' } });
+  expect(state.reads.some((read) => read.path === `/requests/complaint/${entityId}`)).toBe(true);
+  expect(state.reads.some((read) => read.path.startsWith('/resident/requests'))).toBe(false);
+  await expect(dialog).toHaveCount(0); await expect(page.getByLabel(/\d+ unread notifications/)).toHaveCount(0);
 });
 
 test('foreign payloads remain hidden and unsafe notification links never navigate or fetch unrelated APIs', async ({ page }) => {

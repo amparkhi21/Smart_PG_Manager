@@ -15,7 +15,7 @@ const eventView = (event) => ({ id: event._id, status: event.status, response: e
   actor: { id: event.actor, role: event.actorRole, name: event.actorName }, createdAt: event.createdAt });
 const view = (request) => ({
   id: request._id, pgId: request.owner, resident: { id: request.resident, fullName: request.residentName },
-  room: { id: request.room, roomNumber: request.roomNumber }, fromDate: request.fromDate, toDate: request.toDate,
+  room: { id: request.room, roomNumber: request.roomNumber, bedNumber: request.bedNumber || null }, fromDate: request.fromDate, toDate: request.toDate,
   durationDays: request.durationDays, reason: request.reason, emergencyContact: request.emergencyContact || null,
   status: request.status, response: request.response, decidedAt: request.decidedAt, cancelledAt: request.cancelledAt,
   createdAt: request.createdAt, updatedAt: request.updatedAt, history: request.history.map(eventView),
@@ -59,7 +59,7 @@ export const createLeaveRequest = asyncHandler(async (req, res) => {
     const room = await Room.findOne({ _id: resident.room, owner: resident.owner }).select('roomNumber').session(session);
     if (!room) throw new ApiError(409, 'Your room assignment is no longer available');
     const request = new LeaveRequest({ owner: resident.owner, resident: resident._id, residentName: resident.fullName,
-      room: room._id, roomNumber: room.roomNumber, fromDate: req.body.fromDate, toDate: req.body.toDate,
+      room: room._id, roomNumber: room.roomNumber, bedNumber: resident.bedNumber || null, fromDate: req.body.fromDate, toDate: req.body.toDate,
       durationDays: leaveDurationDays(req.body.fromDate, req.body.toDate), reason: req.body.reason,
       emergencyContact: req.body.emergencyContact || '', history: [eventFor(req, 'Pending')] });
     request.notificationEvents = [notificationEvent('leave_requested', request._id, request.owner,

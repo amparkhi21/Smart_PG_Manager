@@ -1,8 +1,8 @@
 const ID = /^[a-f\d]{24}$/i;
 const targets = {
-  complaint_created: ['owner', '/complaints', 'complaint', 'Complaint Management'],
-  complaint_status_updated: ['resident', '/resident/complaints', 'complaint', 'My Complaints'],
-  complaint_response: ['resident', '/resident/complaints', 'complaint', 'My Complaints'],
+  complaint_created: ['owner', '/requests', 'complaint', 'Requests'],
+  complaint_status_updated: ['resident', '/resident/requests', 'complaint', 'My Requests'],
+  complaint_response: ['resident', '/resident/requests', 'complaint', 'My Requests'],
   room_change_requested: ['owner', '/room-change-requests', 'room', 'Room Change Requests'],
   room_change_approved: ['resident', '/resident/room-change-requests', 'room', 'Room Change Requests'],
   room_change_rejected: ['resident', '/resident/room-change-requests', 'room', 'Room Change Requests'],
@@ -30,7 +30,9 @@ export function notificationTarget(item, role) {
   if (!Object.hasOwn(targets, item?.type)) return null;
   const [allowedRole, path, kind, label] = targets[item.type];
   // Exact application paths only: reject schemes, other roles, queries, escapes and fragments.
-  if (role !== allowedRole || item.path !== path || !ID.test(item.relatedEntityId || '')) return null;
+  const legacyComplaintPath = item.type === 'complaint_created' ? '/complaints'
+    : ['complaint_status_updated', 'complaint_response'].includes(item.type) ? '/resident/complaints' : null;
+  if (role !== allowedRole || (item.path !== path && item.path !== legacyComplaintPath) || !ID.test(item.relatedEntityId || '')) return null;
   return { path, kind, label, id: item.relatedEntityId };
 }
 export const notificationTypeLabel = (type) => typeof type === 'string' ? type.replaceAll('_', ' ').replace(/^./, (letter) => letter.toUpperCase()) : 'Update';
@@ -51,8 +53,10 @@ export async function fetchNotificationRecord(api, item, role, signal) {
   const base = role === 'owner' ? '' : '/resident';
   const get = async (path, params) => (await api.get(path, { params, signal })).data.data;
   let record;
-  if (target.kind === 'complaint' || target.kind === 'leave') {
-    record = await get(`${base}/${target.kind === 'complaint' ? 'complaints' : 'leave-requests'}/${target.id}`);
+  if (target.kind === 'complaint') {
+    record = await get(`${role === 'owner' ? '' : '/resident'}/requests/complaint/${target.id}`);
+  } else if (target.kind === 'leave') {
+    record = await get(`${base}/leave-requests/${target.id}`);
   } else {
     let rows;
     if (target.kind === 'room') rows = (await get(`${base}/room-change-requests`)).requests;
@@ -65,6 +69,7 @@ export async function fetchNotificationRecord(api, item, role, signal) {
     }
     record = rows?.find((row) => row.id === target.id);
   }
-  if (!record || record.id !== target.id) throw new Error('This related item is no longer available in this view.');
+  const recordId = target.kind === 'complaint' ? record?.sourceId : record?.id;
+  if (!record || recordId !== target.id) throw new Error('This related item is no longer available in this view.');
   return { target, record };
 }
