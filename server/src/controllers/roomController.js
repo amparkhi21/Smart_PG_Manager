@@ -43,7 +43,8 @@ export const getRoom = asyncHandler(async (req, res) => {
 
 export const createRoom = asyncHandler(async (req, res) => {
   const { roomNumber, floor, roomType, airConditioning, amenities, monthlyRent, capacity, lastMeterReading, notes, bedNumbers } = req.body;
-  validateBedNumbers(bedNumbers, capacity);
+  const beds = bedNumbers ?? Array.from({ length: capacity }, (_, index) => `B${index + 1}`);
+  validateBedNumbers(beds, capacity);
   const room = await Room.create({
     owner: req.owner._id,
     roomNumber,
@@ -53,7 +54,7 @@ export const createRoom = asyncHandler(async (req, res) => {
     amenities,
     monthlyRent,
     capacity,
-    bedNumbers,
+    bedNumbers: beds,
     lastMeterReading,
     notes,
   });
@@ -71,13 +72,18 @@ export const updateRoom = asyncHandler(async (req, res) => {
     }
   }
 
+  if (req.body.bedNumbers !== undefined || req.body.capacity !== undefined) {
+    validateBedNumbers(req.body.bedNumbers ?? (room.bedNumbers?.length ? room.bedNumbers : undefined), req.body.capacity ?? room.capacity);
+  }
   if (req.body.bedNumbers !== undefined) {
-    const capacity = req.body.capacity ?? room.capacity;
-    validateBedNumbers(req.body.bedNumbers, capacity);
     const nextBeds = new Set(req.body.bedNumbers.map((value) => value.toLocaleLowerCase()));
     const assignedResidents = await Resident.find({
       owner: req.owner._id, room: room._id, status: 'Active', bedNumber: { $type: 'string' },
     }).select('bedNumber').session(session);
+    const assignedBeds = assignedResidents.map((resident) => resident.bedNumber.toLocaleLowerCase());
+    if (new Set(assignedBeds).size !== assignedBeds.length) {
+      throw new ApiError(409, 'Existing residents have conflicting bed assignments. Resolve these assignments manually before configuring beds.');
+    }
     const removedBed = assignedResidents.find((resident) => !nextBeds.has(resident.bedNumber.toLocaleLowerCase()));
     if (removedBed) throw new ApiError(409, `Bed ${removedBed.bedNumber} is assigned to an active resident and cannot be removed`);
   }

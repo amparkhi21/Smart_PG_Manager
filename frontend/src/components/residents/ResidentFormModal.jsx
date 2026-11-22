@@ -5,6 +5,7 @@ import api from '../../api/client.js';
 import useFetch from '../../hooks/useFetch.js';
 import Modal from '../ui/Modal.jsx';
 import Skeleton from '../ui/Skeleton.jsx';
+import RoomFormModal from '../rooms/RoomFormModal.jsx';
 import { Field, Input, Select, PasswordInput } from '../ui/FormControls.jsx';
 import { formatCurrency, getErrorMessage, toDateInput, todayInput } from '../../utils/format.js';
 
@@ -14,13 +15,13 @@ const cleanPhone = (v) => v.replace(/[\s().-]/g, '');
 // resident = existing resident (edit) or null (add)
 export default function ResidentFormModal({ resident, onClose, onSaved }) {
   const editing = Boolean(resident);
-  const currentRoomId = resident?.room?._id || resident?.room || '';
+  const currentRoomId = String(resident?.room?._id || resident?.room?.id || resident?.room || '');
 
-  const { data: rooms, loading: roomsLoading, error: roomsError } = useFetch(
+  const { data: rooms, loading: roomsLoading, error: roomsError, reload: reloadRooms } = useFetch(
     async () => (await api.get('/rooms')).data.data,
     []
   );
-  const { data: residents, loading: residentsLoading, error: residentsError } = useFetch(
+  const { data: residents, loading: residentsLoading, error: residentsError, reload: reloadResidents } = useFetch(
     async () => (await api.get('/residents')).data.data,
     []
   );
@@ -42,6 +43,7 @@ export default function ResidentFormModal({ resident, onClose, onSaved }) {
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [configuringRoom, setConfiguringRoom] = useState(null);
 
   const set = (e) => setF((s) => ({ ...s, [e.target.name]: e.target.value }));
 
@@ -53,6 +55,10 @@ export default function ResidentFormModal({ resident, onClose, onSaved }) {
   };
 
   const selectedRoom = (rooms || []).find((r) => r._id === f.room);
+  const bedChoices = [...(selectedRoom?.bedNumbers || [])];
+  if (f.room === currentRoomId && resident?.bedNumber
+    && !bedChoices.some((bed) => bed.toLocaleLowerCase() === resident.bedNumber.toLocaleLowerCase())) bedChoices.push(resident.bedNumber);
+  const selectedBed = bedChoices.find((bed) => bed.toLocaleLowerCase() === f.bedNumber.toLocaleLowerCase()) || f.bedNumber;
   const bedRequired = Boolean(selectedRoom);
   const temporaryPasswordRequired = Boolean(f.loginEnabled && (!resident?.accountStatus || resident.accountStatus === 'unconfigured'));
 
@@ -127,7 +133,8 @@ export default function ResidentFormModal({ resident, onClose, onSaved }) {
   };
 
   return (
-    <Modal title={editing ? `Edit ${resident.fullName}` : 'Add a resident'} onClose={onClose} dismissable={!saving} size="lg">
+    <>
+    <Modal title={editing ? `Edit ${resident.fullName}` : 'Add a resident'} onClose={onClose} dismissable={!saving && !configuringRoom} size="lg">
       <form onSubmit={submit} className="space-y-4" noValidate>
         {(formError || roomsError || residentsError) && (
           <div className="flex items-start gap-2 rounded-xl bg-rose-50 p-3 text-sm text-rose-700" role="alert">
@@ -135,7 +142,8 @@ export default function ResidentFormModal({ resident, onClose, onSaved }) {
           </div>
         )}
 
-        <Field label="Room" htmlFor="room" error={errors.room} required hint="Rooms that are full cannot be selected.">
+        <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Room Number" htmlFor="room" error={errors.room} required hint="Your current room remains available even when full.">
           {roomsLoading && !rooms ? (
             <Skeleton className="h-11" />
           ) : (
@@ -154,24 +162,27 @@ export default function ResidentFormModal({ resident, onClose, onSaved }) {
           )}
         </Field>
 
-        {selectedRoom ? (
-          <Field label="Bed" htmlFor="bedNumber" error={errors.bedNumber} required hint="Each bed can have one active resident. Availability is checked again when saved.">
-            <Select id="bedNumber" name="bedNumber" value={f.bedNumber} onChange={set} invalid={!!errors.bedNumber} disabled={residentsLoading || !selectedRoom.bedNumbers?.length}>
-              <option value="">{selectedRoom.bedNumbers?.length ? 'Select a bed' : 'Configure beds in Rooms first'}</option>
-              {(selectedRoom.bedNumbers || []).map((bed) => {
+          <Field label="Bed Number" htmlFor="bedNumber" error={errors.bedNumber} required hint="Each bed can have one active resident. Availability is checked again when saved.">
+            <Select id="bedNumber" name="bedNumber" value={selectedBed} onChange={set} invalid={!!errors.bedNumber} disabled={!selectedRoom || roomsLoading || residentsLoading || !bedChoices.length}>
+              <option value="">{!selectedRoom ? 'Select room first' : selectedRoom.bedNumbers?.length ? 'Select a bed' : 'Configure beds for this room'}</option>
+              {bedChoices.map((bed) => {
                 const occupant = (residents || []).find((other) => {
                   const otherRoomId = other.room?._id || other.room;
-                  return other.status === 'Active' && String(otherRoomId) === f.room
+                  return other.status === 'Active' && other._id !== resident?._id && String(otherRoomId) === f.room
                     && other.bedNumber?.toLocaleLowerCase() === bed.toLocaleLowerCase();
                 });
-                const availableToResident = !occupant || occupant._id === resident?._id;
+                const availableToResident = !occupant;
+                const currentAssignment = f.room === currentRoomId && resident?.bedNumber?.toLocaleLowerCase() === bed.toLocaleLowerCase();
                 return <option key={bed} value={bed} disabled={!availableToResident}>
-                  {bed}{occupant ? ` · ${occupant._id === resident?._id ? 'Current assignment' : 'Assigned'}` : ' · Available'}
+                  {bed}{occupant ? ' · Assigned' : currentAssignment ? ' · Current assignment' : ' · Available'}
                 </option>;
               })}
             </Select>
+            {selectedRoom && <button type="button" className="mt-2 text-sm font-semibold text-teal-700" disabled={saving || roomsLoading || residentsLoading}
+              onClick={() => setConfiguringRoom(selectedRoom)}>Configure Beds</button>}
+            {selectedRoom && !selectedRoom.bedNumbers?.length && <p className="mt-1 text-xs text-slate-600">Configure this room's beds, then choose this resident's bed manually.</p>}
           </Field>
-        ) : null}
+        </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Full name" htmlFor="fullName" error={errors.fullName} required>
@@ -246,5 +257,11 @@ export default function ResidentFormModal({ resident, onClose, onSaved }) {
         </div>
       </form>
     </Modal>
+    {configuringRoom && <RoomFormModal room={configuringRoom} rooms={rooms || []} bedsOnly onClose={() => setConfiguringRoom(null)} onSaved={async () => {
+      await Promise.all([reloadRooms(), reloadResidents()]);
+      setErrors((value) => ({ ...value, bedNumber: '' }));
+      setConfiguringRoom(null);
+    }} />}
+    </>
   );
 }
