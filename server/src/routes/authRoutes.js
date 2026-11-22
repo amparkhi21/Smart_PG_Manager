@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { body } from 'express-validator';
+import { body, query } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import { register, login, getMe } from '../controllers/authController.js';
 import { protect, protectResident, protectSession } from '../middleware/auth.js';
-import { residentLogin, residentMe, changeResidentPassword, verifyResidentJoin, activateResident } from '../controllers/residentAuthController.js';
+import { residentHostels, residentLogin, residentMe, changeResidentPassword } from '../controllers/residentAuthController.js';
 import { validPassword } from '../utils/residentAuth.js';
 import validate from '../middleware/validate.js';
 
@@ -40,33 +40,18 @@ router.post(
 router.get('/me', protect, getMe);
 router.get('/session', protectSession, (req, res, next) => req.resident ? residentMe(req, res, next) : getMe(req, res, next));
 
-const joinVerificationLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, max: 8, standardHeaders: true, legacyHeaders: false,
-  message: { success: false, message: 'Too many joining attempts. Please wait before trying again.' },
+const residentDiscoveryLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false,
+  message: { success: false, message: 'Too many hostel searches. Please wait before trying again.' },
 });
-const activationLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, max: 8, standardHeaders: true, legacyHeaders: false,
-  message: { success: false, message: 'Too many activation attempts. Please wait before trying again.' },
-});
-
-router.post('/resident/join/verify', joinVerificationLimiter, [
-  body('pgName').isString().bail().trim().notEmpty().isLength({ max: 100 }),
-  body('pgJoiningPassword').isString().bail().notEmpty().isLength({ max: 200 }),
-  body('roomNumber').isString().bail().trim().notEmpty().isLength({ max: 100 }),
-  body('bedNumber').isString().bail().trim().notEmpty().isLength({ max: 20 }),
-  body('pgCode').optional({ checkFalsy: true }).isString().bail().trim().isLength({ max: 40 }),
-], validate, verifyResidentJoin);
-router.post('/resident/join/activate', activationLimiter, [
-  body('challenge').isString().bail().notEmpty().isLength({ max: 2000 }),
-  body('activationCode').isString().bail().notEmpty().isLength({ min: 20, max: 100 }),
-  body('password').isString().bail().custom(validPassword).withMessage('Use at least 8 characters and at most 72 UTF-8 bytes'),
-], validate, activateResident);
+router.get('/resident/hostels', residentDiscoveryLimiter,
+  query('name').isString().bail().trim().isLength({ min: 2, max: 100 }), validate, residentHostels);
 
 router.post('/resident/login', residentLoginLimiter, [
+  body('ownerId').isMongoId(),
   body('pgName').isString().bail().trim().notEmpty().isLength({ max: 100 }),
-  body('pgCode').optional({ checkFalsy: true }).isString().bail().trim().isLength({ max: 40 }),
-  body('roomNumber').optional({ checkFalsy: true }).isString().bail().trim().isLength({ max: 100 }),
-  body('phone').isString().bail().notEmpty().isLength({ max: 40 }),
+  body('roomNumber').isString().bail().trim().notEmpty().isLength({ max: 100 }),
+  body('bedNumber').isString().bail().trim().notEmpty().isLength({ max: 20 }),
   body('password').isString().bail().notEmpty().isLength({ max: 200 }),
 ], residentLogin);
 router.get('/resident/me', protectResident({ allowPasswordChange: true }), residentMe);

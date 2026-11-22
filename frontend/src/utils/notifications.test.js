@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { belongsToNotificationAccount, fetchNotificationRecord, notificationBadge, notificationIdentity, notificationPage, notificationTarget, notificationTypeLabel } from './notifications.js';
 
-const owner = { id: '111111111111111111111111' }, resident = { id: '222222222222222222222222', pgCode: 'PG-' + owner.id.toUpperCase() };
+const owner = { id: '111111111111111111111111' }, resident = { id: '222222222222222222222222', pgId: owner.id };
 const entityId = '333333333333333333333333';
 const item = (extra = {}) => ({ id: '444444444444444444444444', recipientRole: 'resident', recipientId: resident.id, pgId: owner.id,
   type: 'complaint_response', path: '/resident/complaints', relatedEntityId: entityId, title: 'Owner response', message: 'An update', createdAt: '2026-11-21T10:00:00Z', read: false, ...extra });
 
-test('notification identity supports real session PG codes and disables first-login or incomplete sessions', () => {
+test('notification identity uses internal PG IDs and disables first-login or incomplete sessions', () => {
   assert.equal(notificationIdentity(owner, null).pgId, owner.id);
   assert.equal(notificationIdentity(null, resident).pgId, owner.id);
   assert.equal(notificationIdentity(null, { ...resident, pgId: owner.id }).enabled, true);
@@ -49,11 +49,14 @@ test('notification badges cap visually without losing exact counts and types rem
   assert.equal(notificationTypeLabel('payment_claim_submitted'), 'Payment claim submitted'); assert.equal(notificationTypeLabel(null), 'Update');
 });
 test('complaint and leave links use existing role-scoped detail APIs', async () => {
-  const calls = [], api = { get: async (path) => { calls.push(path); return { data: { data: { id: entityId } } }; } };
-  await fetchNotificationRecord(api, item(), 'resident');
+  const complaint = { id: `complaint:${entityId}`, sourceId: entityId };
+  const calls = [], api = { get: async (path) => { calls.push(path); return { data: { data: path.includes('/requests/complaint/') ? complaint : { id: entityId } } }; } };
+  const result = await fetchNotificationRecord(api, item(), 'resident');
+  assert.equal(result.record, complaint);
   await fetchNotificationRecord(api, item({ type: 'leave_requested', path: '/leave-requests' }), 'owner');
   assert.deepEqual(calls, [`/resident/requests/complaint/${entityId}`, `/leave-requests/${entityId}`]);
   await assert.rejects(fetchNotificationRecord(api, item({ path: '/settings' }), 'resident'), /available application link/); assert.equal(calls.length, 2);
+  await assert.rejects(fetchNotificationRecord({ get: async () => ({ data: { data: { ...complaint, sourceId: owner.id } } }) }, item(), 'resident'), /no longer available/);
 });
 test('room, payment and notice links use only supported list APIs and reject unavailable records', async () => {
   const calls = [], api = { get: async (path, config) => { calls.push([path, config.params]); return { data: { data: path === '/payment-claims' || path === '/resident/payments/claims' ? [{ id: entityId }] : { requests: [{ id: entityId }], notices: [{ id: entityId }] } } }; } };

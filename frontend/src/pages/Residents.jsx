@@ -14,7 +14,6 @@ import ErrorState from '../components/ui/ErrorState.jsx';
 import IconButton from '../components/ui/IconButton.jsx';
 import { Select } from '../components/ui/FormControls.jsx';
 import ResidentFormModal from '../components/residents/ResidentFormModal.jsx';
-import PgCode from '../components/residents/PgCode.jsx';
 import { formatCurrency, formatDate } from '../utils/format.js';
 
 const ACCOUNT_LABELS = { active: 'Login enabled', disabled: 'Login disabled', unconfigured: 'Not configured' };
@@ -64,8 +63,6 @@ export default function Residents() {
           <Plus size={18} /> Add resident
         </button>
       </PageHeader>
-
-      <PgCode className="card mb-4 p-4" />
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2 md:items-center">
         <SearchInput value={search} onChange={setSearch} placeholder="Search by name or phone" />
@@ -135,7 +132,7 @@ export default function Residents() {
                           </span>
                         </Link>
                       </td>
-                      <td className="px-4 py-3 font-medium text-slate-700">{r.room?.roomNumber || '-'}</td>
+                      <td className="px-4 py-3 font-medium text-slate-700">{r.room?.roomNumber ? <>Room {r.room.roomNumber}{r.bedNumber ? ` · Bed ${r.bedNumber}` : ''}</> : '-'}</td>
                       <td className="px-4 py-3 text-slate-600">{formatDate(r.joiningDate)}</td>
                       <td className="px-4 py-3 font-semibold text-slate-900">{formatCurrency(r.monthlyRent)}</td>
                       <td className="px-4 py-3"><StatusBadge status={r.status} /><p className="mt-1 text-xs text-slate-500">{ACCOUNT_LABELS[r.accountStatus || 'unconfigured']}</p></td>

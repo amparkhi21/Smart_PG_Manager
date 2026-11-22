@@ -13,7 +13,6 @@ import { getErrorMessage } from '../utils/format.js';
 import { DEFAULT_REMINDER_TEMPLATES } from '../utils/reminders.js';
 import { validUpiId } from '../utils/upiPayments.js';
 import PushNotificationSettings from '../components/PushNotificationSettings.jsx';
-import PGAccessManagement from '../components/settings/PGAccessManagement.jsx';
 
 const initialForm = {
   name: '',
@@ -226,9 +225,6 @@ export default function Settings() {
           </button>
         </div>
       </form>
-      <div className="mt-5">
-        <PGAccessManagement />
-      </div>
       <PushNotificationSettings />
     </div>
   );

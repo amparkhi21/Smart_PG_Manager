@@ -9,7 +9,7 @@ import ErrorState from '../components/ui/ErrorState.jsx';
 export function ResidentDetails({ resident }) {
   const fields = [
     ['Full name', resident.fullName], ['Phone number', resident.phone], ['Email address', resident.email || 'Not provided'],
-    ['Hostel / PG', resident.pgName], ['PG code', resident.pgCode], ['Assigned room', resident.room.roomNumber],
+    ['Hostel / PG', resident.pgName], ['Assigned room', resident.room.roomNumber], ['Bed', resident.bedNumber || 'Not assigned'],
     ['Joining date', formatDate(resident.joiningDate)], ['Account status', resident.accountStatus === 'active' ? 'Active' : 'Disabled'],
     ['First login', resident.firstLoginAt ? formatDateTime(resident.firstLoginAt) : 'Not recorded'],
     ['Last successful login', resident.lastLoginAt ? formatDateTime(resident.lastLoginAt) : 'Not recorded'],

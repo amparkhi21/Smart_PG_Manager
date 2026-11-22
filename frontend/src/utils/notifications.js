@@ -20,7 +20,7 @@ const targets = {
 export function notificationIdentity(owner, resident) {
   const role = owner ? 'owner' : 'resident', user = owner || resident;
   const id = String(user?.id || user?._id || '').toLowerCase();
-  const pgId = owner ? id : String(resident?.pgId || /^PG-([a-f\d]{24})$/i.exec(resident?.pgCode || '')?.[1] || '').toLowerCase();
+  const pgId = owner ? id : String(resident?.pgId || '').toLowerCase();
   return { id, pgId, role, key: `${role}:${pgId}:${id}`, enabled: Boolean(ID.test(id) && ID.test(pgId) && !resident?.passwordChangeRequired) };
 }
 export function belongsToNotificationAccount(item, identity) {

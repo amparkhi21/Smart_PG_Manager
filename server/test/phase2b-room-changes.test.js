@@ -112,11 +112,14 @@ test('Phase 2B room requests, approval races and preserved history on isolated M
     assert.equal((await decide(loser.data.id, 'Rejected', 'The room is now full')).status, 200);
   });
   await t.test('approval races with owner admissions, capacity edits and deletion remain safe', async () => {
-    const room = await emptyRoom(), actor = await person(), submitted = await ask(actor, room);
-    const admission = { room: String(room._id), fullName: 'Owner Admission', phone: '9799999999', monthlyRent: 7000 };
+    const room = await emptyRoom();
+    room.bedNumbers = ['B1']; await room.save();
+    const actor = await person(), submitted = await ask(actor, room, { targetBedNumber: 'B1' });
+    const admission = { room: String(room._id), bedNumber: 'B1', fullName: 'Owner Admission', phone: '9799999999', monthlyRent: 7000 };
     const results = await Promise.all([decide(submitted.data.id), request('POST', '/residents', admission)]);
     assert.deepEqual(results.map((result) => result.status).sort(), results[0].status === 200 ? [200, 409] : [201, 409]);
     assert.equal(await Resident.countDocuments({ owner: owner._id, room: room._id, status: 'Active' }), 1);
+    assert.equal(await Resident.countDocuments({ owner: owner._id, room: room._id, bedNumber: 'B1', status: 'Active' }), 1);
     const capRoom = await emptyRoom(), capActor = await person();
     capRoom.capacity = 2; await capRoom.save();
     await Resident.create({ owner: owner._id, room: capRoom._id, fullName: 'Existing Occupant', phone: '9799999998', monthlyRent: 4000 });

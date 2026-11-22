@@ -68,7 +68,7 @@ export const createResident = asyncHandler(async (req, res) => {
   const { resident, room } = await withOccupancyTransaction(req.owner._id, async (session) => {
   const room = await findOwned(Room, req.body.room, req, undefined, session);
   await assertCapacity(req.owner._id, room, undefined, session);
-  const bedNumber = resolveBedNumber(room, req.body.bedNumber, { required: Boolean(room.bedNumbers?.length) });
+  const bedNumber = resolveBedNumber(room, req.body.bedNumber, { required: true });
   await assertBedAvailable(req.owner._id, room, bedNumber, undefined, session);
 
   const resident = new Resident({
@@ -91,7 +91,7 @@ export const createResident = asyncHandler(async (req, res) => {
 
 export const updateResident = asyncHandler(async (req, res) => {
   const resident = await withOccupancyTransaction(req.owner._id, async (session) => {
-  const resident = await findOwned(Resident, req.params.id, req, undefined, session);
+  const resident = await findOwned(Resident, req.params.id, req, undefined, session, '+passwordHash');
   if (resident.status === 'Left') throw new ApiError(409, 'This resident has left and can no longer be edited');
 
   const roomChanged = req.body.room && String(req.body.room) !== String(resident.room);
@@ -102,9 +102,7 @@ export const updateResident = asyncHandler(async (req, res) => {
   if (roomChanged || req.body.bedNumber !== undefined) {
     const previousRoom = await findOwned(Room, resident.room, req, undefined, session);
     const nextRoom = roomChanged ? await findOwned(Room, req.body.room, req, undefined, session) : previousRoom;
-    const bedNumber = resolveBedNumber(nextRoom, req.body.bedNumber, {
-      required: Boolean(roomChanged && nextRoom.bedNumbers?.length),
-    });
+    const bedNumber = resolveBedNumber(nextRoom, req.body.bedNumber, { required: true });
     await assertBedAvailable(req.owner._id, nextRoom, bedNumber, resident._id, session);
     setResidentBed(resident, previousRoom, nextRoom, bedNumber);
   }

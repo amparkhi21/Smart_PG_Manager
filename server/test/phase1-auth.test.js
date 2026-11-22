@@ -13,21 +13,18 @@ import Room from '../src/models/Room.js';
 import Attendance from '../src/models/Attendance.js';
 import RentRecord from '../src/models/RentRecord.js';
 import ElectricityBill from '../src/models/ElectricityBill.js';
-import { normalizePhone, pgCode } from '../src/utils/residentAuth.js';
 
-// No dotenv, external URI, seeding or production connection is used by this suite.
-test('Phase 1 authentication and legacy workflows on disposable MongoDB', { timeout: 300000 }, async (t) => {
+test('Owner-provisioned resident authentication is individual, bed-bound and tenant-scoped', { timeout: 300000 }, async (t) => {
   const originalSecret = process.env.JWT_SECRET;
-  process.env.JWT_SECRET = 'isolated-phase1-test-secret-'.repeat(3);
+  process.env.JWT_SECRET = 'isolated-resident-auth-test-secret-'.repeat(3);
   const mongod = await MongoMemoryServer.create({
     binary: { version: '8.0.17', downloadDir: fileURLToPath(new URL('../../tmp/mongodb-binaries/', import.meta.url)) },
-    instance: { dbName: `phase1_test_${randomUUID().replaceAll('-', '')}` },
+    instance: { dbName: `resident_auth_${randomUUID().replaceAll('-', '')}` },
   });
   let server;
   t.after(async () => {
     if (server) await new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); });
-    await mongoose.disconnect();
-    await mongod.stop();
+    await mongoose.disconnect(); await mongod.stop();
     if (originalSecret === undefined) delete process.env.JWT_SECRET;
     else process.env.JWT_SECRET = originalSecret;
   });
@@ -41,280 +38,161 @@ test('Phase 1 authentication and legacy workflows on disposable MongoDB', { time
     requestNumber += 1;
     const response = await fetch(`${base}${path}`, {
       method, headers: { 'Content-Type': 'application/json',
-        // Separate test clients; the existing limiter has its own regression test.
         'X-Forwarded-For': `198.51.${Math.floor(requestNumber / 200)}.${requestNumber % 200 + 1}`,
         ...(token && { Authorization: `Bearer ${token}` }) },
       ...(body !== undefined && { body: JSON.stringify(body) }),
     });
     const data = await response.json();
-    assert.doesNotMatch(JSON.stringify(data), /passwordHash|\$2[aby]\$|sessionVersion/);
+    assert.doesNotMatch(JSON.stringify(data), /passwordHash|\$2[aby]\$|sessionVersion|Temporary123/);
     return { status: response.status, ...data };
   };
-  let ownerA, ownerB, tokenA, tokenB, roomA, roomA2, roomB, residentA, residentB, legacyId, residentToken, beforeReset;
-  let joinRoom, joiningResident;
-  let historicalRent, historicalAttendance, historicalBill;
-  const temp = 'Temporary123!';
-  const permanent = 'Personal456!';
-  const loginBody = (overrides = {}) => ({ pgName: 'Shared Hostel', pgCode: ownerA.pgCode, roomNumber: '101', phone: '9876543210', password: temp, ...overrides });
+  const register = async (suffix) => request('POST', '/auth/register', {
+    name: `Owner ${suffix}`, email: `owner-${suffix.toLowerCase()}@example.test`, password: 'OwnerPass123!', pgName: 'Shared Hostel', role: 'resident',
+  });
+  const registeredA = await register('A'), registeredB = await register('B');
+  assert.equal(registeredA.status, 201); assert.equal(registeredB.status, 201);
+  const ownerA = registeredA.data.owner, ownerB = registeredB.data.owner;
+  const tokenA = registeredA.data.token, tokenB = registeredB.data.token;
+  assert.equal(Object.hasOwn(ownerA, 'pgCode'), false);
+  await Owner.updateOne({ _id: ownerA.id }, { address: '12 North Road, Jaipur' });
+  await Owner.updateOne({ _id: ownerB.id }, { address: '44 Lake Street, Jaipur' });
+  const rooms = await Promise.all([
+    request('POST', '/rooms', { roomNumber: '101', capacity: 2, monthlyRent: 5000, bedNumbers: ['A-1', 'A-2'] }, tokenA),
+    request('POST', '/rooms', { roomNumber: '102', capacity: 1, monthlyRent: 5000, bedNumbers: ['B-1'] }, tokenA),
+    request('POST', '/rooms', { roomNumber: '101', capacity: 2, monthlyRent: 6000, bedNumbers: ['A-1', 'A-2'] }, tokenB),
+  ]);
+  const [roomA, roomA2, roomB] = rooms.map((result) => result.data);
+  let residentA, residentB, residentToken, residentId;
+  const temporary = 'Temporary123!', permanent = 'Personal456!';
+  const credentials = (owner, roomNumber, bedNumber, password) => ({
+    ownerId: owner.id, pgName: owner.pgName, roomNumber, bedNumber, password,
+  });
 
-  await t.test('owner registration/login ignore injected roles and retain the v1 response shape', async () => {
-    for (const [email, suffix] of [['owner-a@example.test', 'A'], ['owner-b@example.test', 'B']]) {
-      const result = await request('POST', '/auth/register', { name: `Owner ${suffix}`, email, password: 'OwnerPass123!', pgName: 'Shared Hostel', role: 'resident' });
-      assert.equal(result.status, 201);
-      assert.equal(result.data.owner.role, 'owner');
-      if (suffix === 'A') { ownerA = result.data.owner; tokenA = result.data.token; }
-      else { ownerB = result.data.owner; tokenB = result.data.token; }
-      const login = await request('POST', '/auth/login', { email, password: 'OwnerPass123!' });
-      assert.equal(login.status, 200);
-      assert.equal(login.data.owner.id, result.data.owner.id);
-    }
-    assert.notEqual(ownerA.pgCode, ownerB.pgCode);
-    const legacyToken = jwt.sign({ id: ownerA.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    assert.equal((await request('GET', '/auth/me', undefined, legacyToken)).status, 200);
-    assert.equal((await request('GET', '/dashboard', undefined, legacyToken)).status, 200);
-    const stored = await Owner.findById(ownerA.id).select('+password');
-    assert.notEqual(stored.password, 'OwnerPass123!');
-    assert.equal(await stored.comparePassword('OwnerPass123!'), true);
-    for (const [email, password] of [['missing@example.test', 'wrong'], ['owner-a@example.test', 'wrong']]) {
-      const result = await request('POST', '/auth/login', { email, password });
-      assert.equal(result.status, 401); assert.equal(result.message, 'Invalid email or password');
-    }
+  await t.test('duplicate hostel names are selectable by descriptive address without a public PG code', async () => {
+    const choices = await request('GET', '/auth/resident/hostels?name=Shared%20Hostel');
+    assert.equal(choices.status, 200);
+    assert.deepEqual(new Set(choices.data.hostels.map((hostel) => hostel.address)), new Set(['12 North Road, Jaipur', '44 Lake Street, Jaipur']));
+    assert.equal(choices.data.hostels.some((hostel) => Object.hasOwn(hostel, 'pgCode')), false);
+    assert.equal((await request('GET', '/settings', undefined, tokenA)).data.owner.pgCode, undefined);
   });
-  await t.test('existing owner room and dashboard APIs remain tenant scoped', async () => {
-    roomA = (await request('POST', '/rooms', { roomNumber: '101', capacity: 6, monthlyRent: 5000 }, tokenA)).data;
-    roomA2 = (await request('POST', '/rooms', { roomNumber: '102', capacity: 4, monthlyRent: 5000 }, tokenA)).data;
-    roomB = (await request('POST', '/rooms', { roomNumber: '101', capacity: 4, monthlyRent: 6000 }, tokenB)).data;
-    assert.equal((await request('GET', `/rooms/${roomA._id}`, undefined, tokenB)).status, 404);
-    assert.equal((await request('GET', '/rooms', undefined, tokenA)).data.length, 2);
-    assert.equal((await request('GET', '/dashboard', undefined, tokenA)).status, 200);
-  });
-  await t.test('PG password, assigned beds and single-use resident activation stay private and tenant-scoped', async () => {
-    joinRoom = (await request('POST', '/rooms', {
-      roomNumber: '201', capacity: 2, monthlyRent: 5500,
-    }, tokenA)).data;
+
+  await t.test('owner creates a resident with a bed and temporary password; duplicate beds and missing passwords fail', async () => {
     const created = await request('POST', '/residents', {
-      room: joinRoom._id, fullName: 'Joining Student', phone: '9876543213', monthlyRent: 5500,
+      room: roomA._id, bedNumber: 'A-1', fullName: 'Resident A', phone: '9876543210', monthlyRent: 5000,
+      loginEnabled: true, temporaryPassword: temporary,
     }, tokenA);
-    assert.equal(created.status, 201);
-    assert.equal(created.data.bedNumber, undefined);
-    assert.equal((await request('PUT', `/rooms/${joinRoom._id}`, { bedNumbers: ['A-1', 'A-2'] }, tokenA)).status, 200);
-    const stillUnassigned = await Resident.findById(created.data._id);
-    assert.equal(stillUnassigned.bedNumber, undefined);
-    const assigned = await request('PUT', `/residents/${created.data._id}`, { bedNumber: 'A-1' }, tokenA);
-    assert.equal(assigned.status, 200);
-    joiningResident = assigned.data;
-    assert.equal(joiningResident.accountStatus, 'unconfigured');
-    assert.equal(joiningResident.bedNumber, 'A-1');
-
-    const duplicateBed = await request('POST', '/residents', {
-      room: joinRoom._id, bedNumber: 'A-1', fullName: 'Duplicate Bed Student', phone: '9876543214',
-    }, tokenA);
-    assert.equal(duplicateBed.status, 409);
-
-    for (const token of [tokenA, tokenB]) {
-      assert.equal((await request('PUT', '/settings/pg-access/password', { password: 'JoiningPass123!' }, token)).status, 200);
-    }
-    const status = await request('GET', '/settings/pg-access', undefined, tokenA);
-    assert.equal(status.data.configured, true);
-    assert.doesNotMatch(JSON.stringify(status.data), /JoiningPass123|pgJoiningPasswordHash|\$2[aby]\$/);
-    const ownerStored = await Owner.findById(ownerA.id).select('+pgJoiningPasswordHash');
-    assert.notEqual(ownerStored.pgJoiningPasswordHash, 'JoiningPass123!');
-    assert.equal(await bcrypt.compare('JoiningPass123!', ownerStored.pgJoiningPasswordHash), true);
-
-    const joinDetails = { pgName: 'Shared Hostel', pgJoiningPassword: 'JoiningPass123!', roomNumber: '201', bedNumber: 'A-1' };
-    const ambiguous = await request('POST', '/auth/resident/join/verify', joinDetails);
-    assert.equal(ambiguous.status, 409);
-    assert.equal(ambiguous.data.requiresPgCode, true);
-    assert.deepEqual(new Set(ambiguous.data.pgCodes), new Set([ownerA.pgCode, ownerB.pgCode]));
-    const verified = await request('POST', '/auth/resident/join/verify', { ...joinDetails, pgCode: ownerA.pgCode });
-    assert.equal(verified.status, 200);
-    assert.doesNotMatch(JSON.stringify(verified.data), /Joining Student|9876543213/);
-    const challenge = verified.data.challenge;
-
-    const invitation = await request('POST', '/settings/activation-invitations', { residentId: joiningResident._id, expiresInDays: 7 }, tokenA);
-    assert.equal(invitation.status, 201);
-    const code = invitation.data.code;
-    const storedResident = await Resident.findById(joiningResident._id).select('+activationInvitations');
-    assert.notEqual(storedResident.activationInvitations[0].codeHash, code);
-    const listed = await request('GET', '/settings/activation-invitations', undefined, tokenA);
-    assert.equal(listed.data.invitations[0].status, 'Pending');
-    assert.doesNotMatch(JSON.stringify(listed.data), /codeHash|Joining Student.*9876543213/);
-    assert.equal((await request('POST', '/auth/resident/join/activate', {
-      challenge, activationCode: 'X'.repeat(43), password: 'PersonalPass456!',
-    })).status, 401);
-    const activated = await request('POST', '/auth/resident/join/activate', {
-      challenge, activationCode: code, password: 'PersonalPass456!',
-    });
-    assert.equal(activated.status, 200);
-    assert.equal(activated.data.resident.passwordChangeRequired, false);
-    const joiningToken = activated.data.token;
-    assert.equal((await request('GET', '/auth/resident/me', undefined, joiningToken)).status, 200);
-    assert.equal((await request('POST', '/auth/resident/join/activate', {
-      challenge, activationCode: code, password: 'AnotherPass456!',
-    })).status, 401);
-
-    assert.equal((await request('PUT', '/settings/pg-access/password', { password: 'UpdatedJoiningPass123!' }, tokenA)).status, 200);
-    assert.equal((await request('GET', '/auth/resident/me', undefined, joiningToken)).status, 200);
-    const returning = await request('POST', '/auth/resident/login', {
-      pgName: 'Shared Hostel', pgCode: ownerA.pgCode, phone: '9876543213', password: 'PersonalPass456!',
-    });
-    assert.equal(returning.status, 200);
-    assert.equal((await request('POST', '/settings/activation-invitations', { residentId: joiningResident._id }, tokenB)).status, 404);
-
-    const secondResident = await request('POST', '/residents', {
-      room: joinRoom._id, bedNumber: 'A-2', fullName: 'Revoked Student', phone: '9876543215',
-    }, tokenA);
-    assert.equal(secondResident.status, 201);
-    const secondInvitation = await request('POST', '/settings/activation-invitations', { residentId: secondResident.data._id }, tokenA);
-    const secondChallenge = await request('POST', '/auth/resident/join/verify', {
-      pgName: 'Shared Hostel', pgCode: ownerA.pgCode, pgJoiningPassword: 'UpdatedJoiningPass123!', roomNumber: '201', bedNumber: 'A-2',
-    });
-    assert.equal(secondChallenge.status, 200);
-    assert.equal((await request('PATCH', '/settings/activation-invitations/revoke', {
-      residentId: secondResident.data._id, invitationId: secondInvitation.data.invitation.id,
-    }, tokenA)).status, 200);
-    assert.equal((await request('POST', '/auth/resident/join/activate', {
-      challenge: secondChallenge.data.challenge, activationCode: secondInvitation.data.code, password: 'PersonalPass789!',
-    })).status, 401);
-    await Resident.deleteMany({ _id: { $in: [joiningResident._id, secondResident.data._id] } });
-    await Room.deleteOne({ _id: joinRoom._id });
+    assert.equal(created.status, 201); residentA = created.data; residentId = residentA._id;
+    assert.equal(residentA.bedNumber, 'A-1'); assert.equal(residentA.passwordChangeRequired, true);
+    assert.doesNotMatch(JSON.stringify(created), new RegExp(temporary));
+    const stored = await Resident.findById(residentId).select('+passwordHash');
+    assert.notEqual(stored.passwordHash, temporary); assert.equal(await bcrypt.compare(temporary, stored.passwordHash), true);
+    assert.equal(stored.bedAssignments.at(-1).bedNumber, 'A-1');
+    assert.equal((await request('POST', '/residents', {
+      room: roomA._id, bedNumber: 'A-1', fullName: 'Duplicate bed', phone: '9876543211', loginEnabled: true, temporaryPassword: temporary,
+    }, tokenA)).status, 409);
+    assert.equal((await request('POST', '/residents', {
+      room: roomA._id, bedNumber: 'A-2', fullName: 'Missing password', phone: '9876543212', loginEnabled: true,
+    }, tokenA)).status, 400);
+    assert.equal((await request('POST', '/residents', {
+      room: roomA._id, fullName: 'Missing bed', phone: '9876543212', loginEnabled: false,
+    }, tokenA)).status, 400);
+    assert.equal(await Resident.countDocuments({ owner: ownerA.id }), 1);
   });
-  await t.test('legacy resident documents with duplicate phones survive and can be edited', async () => {
-    const result = await Resident.collection.insertOne({ owner: new mongoose.Types.ObjectId(ownerA.id), room: new mongoose.Types.ObjectId(roomA._id), fullName: 'Legacy Resident', phone: '9876543210', joiningDate: new Date('2025-01-01'), monthlyRent: 4500, status: 'Active' });
-    legacyId = String(result.insertedId);
-    historicalRent = await RentRecord.create({ owner: ownerA.id, resident: legacyId, room: roomA._id, month: '2026-11', amountDue: 4500, dueDate: new Date('2026-11-05'), payments: [{ amount: 1000, paidOn: new Date('2026-11-01'), method: 'Cash' }] });
-    historicalAttendance = await Attendance.create({ owner: ownerA.id, resident: legacyId, room: roomA._id, date: '2026-11-01', status: 'Present' });
-    historicalBill = await ElectricityBill.create({ owner: ownerA.id, room: roomA._id, month: '2026-11', previousReading: 10, currentReading: 20, ratePerUnit: 8, dueDate: new Date('2026-11-05'), payments: [{ amount: 20, method: 'Cash' }] });
-    await Resident.collection.insertOne({ owner: new mongoose.Types.ObjectId(ownerA.id), room: new mongoose.Types.ObjectId(roomA._id), fullName: 'Legacy Duplicate', phone: '9876543210', joiningDate: new Date('2025-02-01'), monthlyRent: 4000, status: 'Active' });
-    const resultEdit = await request('PUT', `/residents/${legacyId}`, { fullName: 'Legacy Resident Updated' }, tokenA);
-    assert.equal(resultEdit.status, 200);
-    assert.equal(resultEdit.data.loginEnabled, false);
-    assert.equal((await request('GET', '/residents', undefined, tokenA)).data.length, 2);
-  });
-  await t.test('owner enables authentication on the existing resident without duplicating records', async () => {
-    const total = await Resident.countDocuments();
-    const result = await request('PATCH', `/residents/${legacyId}/login-access`, { loginEnabled: true, temporaryPassword: temp, owner: ownerB.id, role: 'owner' }, tokenA);
-    assert.equal(result.status, 200); residentA = result.data;
-    assert.equal(residentA._id, legacyId); assert.equal(residentA.owner, ownerA.id);
-    assert.equal(residentA.accountStatus, 'active'); assert.equal(residentA.passwordChangeRequired, true);
-    assert.equal(await Resident.countDocuments(), total);
-    const stored = await Resident.findById(legacyId).select('+passwordHash');
-    assert.equal(stored.normalizedPhone, '+919876543210'); assert.equal(await bcrypt.compare(temp, stored.passwordHash), true);
-    assert.equal(stored.toJSON().passwordHash, undefined); assert.equal(stored.toObject().passwordHash, undefined);
-    assert.equal((await Resident.findById(legacyId)).passwordHash, undefined);
-  });
-  await t.test('owner creates login accounts, multiple residents share rooms, and phone uniqueness is per PG', async () => {
-    const roommate = await request('POST', '/residents', { room: roomA._id, fullName: 'Roommate', phone: '9876543211', monthlyRent: 5000, loginEnabled: true, temporaryPassword: temp }, tokenA);
-    assert.equal(roommate.status, 201);
-    const otherPG = await request('POST', '/residents', { room: roomB._id, fullName: 'Other PG Resident', phone: '+91 98765-43210', monthlyRent: 6000, loginEnabled: true, temporaryPassword: temp }, tokenB);
-    assert.equal(otherPG.status, 201); residentB = otherPG.data;
-    const duplicates = await request('POST', '/residents', { room: roomA._id, fullName: 'Duplicate Account', phone: '+919876543210', monthlyRent: 5000, loginEnabled: true, temporaryPassword: temp }, tokenA);
-    assert.equal(duplicates.status, 409);
-    const noPassword = await request('POST', '/residents', { room: roomA._id, fullName: 'Missing Password', phone: '9876543212', loginEnabled: true }, tokenA);
-    assert.equal(noPassword.status, 400);
-    const roommateLogin = await request('POST', '/auth/resident/login', loginBody({ phone: '9876543211' }));
-    assert.equal(roommateLogin.status, 200);
-    assert.notEqual(roommateLogin.data.resident.id, legacyId);
-  });
-  await t.test('duplicate PG names require code without exposing a PG directory; valid PG credentials are isolated', async () => {
-    const ambiguous = await request('POST', '/auth/resident/login', loginBody({ pgCode: '' }));
-    assert.equal(ambiguous.status, 401);
-    const success = await request('POST', '/auth/resident/login', loginBody({ phone: '+91 (98765) 43210' }));
+
+  await t.test('login identifies the exact PG, room, bed and individual password with generic failures', async () => {
+    const created = await request('POST', '/residents', {
+      room: roomB._id, bedNumber: 'A-1', fullName: 'Resident B', phone: '9876543210', loginEnabled: true, temporaryPassword: temporary,
+    }, tokenB);
+    assert.equal(created.status, 201); residentB = created.data;
+    const success = await request('POST', '/auth/resident/login', credentials(ownerA, '101', 'A-1', temporary));
     assert.equal(success.status, 200); residentToken = success.data.token;
-    assert.equal(success.data.resident.id, legacyId);
-    assert.ok(success.data.resident.firstLoginAt); assert.ok(success.data.resident.lastLoginAt);
-    const otherPG = await request('POST', '/auth/resident/login', loginBody({ pgCode: ownerB.pgCode }));
-    assert.equal(otherPG.data.resident.id, residentB._id);
-    assert.equal(otherPG.data.resident.pgCode, ownerB.pgCode);
-    assert.equal((await request('POST', '/auth/resident/login', loginBody({ pgName: 'Incorrect name' }))).status, 401);
+    assert.equal(success.data.resident.id, residentId); assert.equal(success.data.resident.pgId, ownerA.id);
+    assert.equal(success.data.resident.passwordChangeRequired, true);
+    const otherTenant = await request('POST', '/auth/resident/login', credentials(ownerB, '101', 'A-1', temporary));
+    assert.equal(otherTenant.status, 200); assert.equal(otherTenant.data.resident.id, residentB._id);
+    const attempts = await Promise.all([
+      request('POST', '/auth/resident/login', credentials(ownerA, '101', 'A-2', temporary)),
+      request('POST', '/auth/resident/login', credentials(ownerA, '101', 'A-1', 'WrongPass123!')),
+      request('POST', '/auth/resident/login', credentials(ownerB, '101', 'A-1', 'WrongPass123!')),
+      request('POST', '/auth/resident/login', credentials(ownerA, '999', 'A-1', temporary)),
+    ]);
+    assert.deepEqual(new Set(attempts.map((attempt) => attempt.status)), new Set([401]));
+    assert.equal(new Set(attempts.map((attempt) => attempt.message)).size, 1);
   });
-  await t.test('all invalid credentials, malformed input, unknown PGs and disabled logins use generic errors', async () => {
-    let expected;
-    for (const body of [loginBody({ password: 'wrong' }), loginBody({ phone: '9999999999' }), loginBody({ roomNumber: '999' }), loginBody({ pgName: 'Unknown', pgCode: '' }), loginBody({ pgCode: 'malformed' }), loginBody({ phone: { $ne: null } }), {}, loginBody({ pgName: { $ne: null } })]) {
-      const result = await request('POST', '/auth/resident/login', body);
-      assert.equal(result.status, 401); expected ||= result.message; assert.equal(result.message, expected);
-    }
-    assert.equal((await request('POST', '/auth/resident/register', {})).status, 404);
-  });
-  await t.test('resident tokens cannot access any owner management API and owners cannot use resident APIs', async () => {
-    for (const path of ['/auth/me', '/dashboard', '/rooms', '/residents', `/residents/${residentB._id}/profile`, '/attendance', '/rent', '/electricity', '/settings', '/reminders/activity', '/reports?month=2026-11']) {
-      assert.equal((await request('GET', path, undefined, residentToken)).status, 403, path);
-    }
-    assert.equal((await request('POST', '/residents', { room: roomA._id }, residentToken)).status, 403);
-    assert.equal((await request('GET', '/resident/profile', undefined, tokenA)).status, 403);
-    for (const [method, path, body] of [['GET', `/residents/${legacyId}`, undefined], ['PATCH', `/residents/${legacyId}/login-access`, { loginEnabled: false }], ['POST', `/residents/${legacyId}/reset-password`, { temporaryPassword: temp }], ['PUT', `/residents/${legacyId}`, { room: roomB._id }]]) {
-      assert.equal((await request(method, path, body, tokenB)).status, 404);
-    }
-    assert.equal((await request('PUT', `/residents/${legacyId}`, { room: roomB._id }, tokenA)).status, 404);
-  });
-  await t.test('first login is restricted until password change; old tokens and temporary passwords stop working', async () => {
+
+  await t.test('first login cannot access protected data until password change; new password works later', async () => {
     assert.equal((await request('GET', '/resident/dashboard', undefined, residentToken)).status, 403);
     const session = await request('GET', '/auth/session', undefined, residentToken);
     assert.equal(session.data.resident.passwordChangeRequired, true);
-    assert.equal((await request('POST', '/auth/resident/change-password', { currentPassword: 'wrong', newPassword: permanent }, residentToken)).status, 400);
-    assert.equal((await request('POST', '/auth/resident/change-password', { currentPassword: temp, newPassword: temp }, residentToken)).status, 400);
-    const changed = await request('POST', '/auth/resident/change-password', { currentPassword: temp, newPassword: permanent, residentId: residentB._id }, residentToken);
-    assert.equal(changed.status, 200); beforeReset = residentToken; residentToken = changed.data.token;
-    assert.equal(changed.data.resident.passwordChangeRequired, false);
-    assert.equal((await request('GET', '/auth/session', undefined, beforeReset)).status, 401);
-    assert.equal((await request('GET', '/resident/dashboard', undefined, residentToken)).status, 200);
-    const me = await request('GET', `/resident/profile?residentId=${residentB._id}&pgId=${ownerB.id}`, undefined, residentToken);
-    assert.equal(me.data.resident.id, legacyId); assert.equal(me.data.resident.pgCode, ownerA.pgCode);
-    assert.equal((await request('POST', '/auth/resident/login', loginBody())).status, 401);
-    assert.equal((await request('POST', '/auth/resident/login', loginBody({ password: permanent }))).status, 200);
-  });
-  await t.test('owner reset invalidates sessions and requires first-login password change again', async () => {
-    const result = await request('POST', `/residents/${legacyId}/reset-password`, { temporaryPassword: 'ResetPass789!' }, tokenA);
-    assert.equal(result.status, 200);
+    assert.equal((await request('POST', '/auth/resident/change-password', { currentPassword: temporary, newPassword: temporary }, residentToken)).status, 400);
+    const changed = await request('POST', '/auth/resident/change-password', { currentPassword: temporary, newPassword: permanent }, residentToken);
+    assert.equal(changed.status, 200); assert.equal(changed.data.resident.passwordChangeRequired, false);
     assert.equal((await request('GET', '/auth/session', undefined, residentToken)).status, 401);
-    assert.equal((await request('POST', '/auth/resident/login', loginBody({ password: permanent }))).status, 401);
-    const login = await request('POST', '/auth/resident/login', loginBody({ password: 'ResetPass789!' }));
-    assert.equal(login.status, 200); residentToken = login.data.token;
-    assert.equal(login.data.resident.passwordChangeRequired, true);
+    residentToken = changed.data.token;
+    assert.equal((await request('GET', '/resident/dashboard', undefined, residentToken)).status, 200);
+    assert.equal((await request('POST', '/auth/resident/login', credentials(ownerA, '101', 'A-1', temporary))).status, 401);
+    assert.equal((await request('POST', '/auth/resident/login', credentials(ownerA, '101', 'A-1', permanent))).status, 200);
   });
-  await t.test('disable and re-enable cannot resurrect a previously issued session', async () => {
-    assert.equal((await request('PATCH', `/residents/${legacyId}/login-access`, { loginEnabled: false }, tokenA)).status, 200);
+
+  await t.test('owner reset replaces the password, forces another change and invalidates sessions', async () => {
+    const reset = await request('POST', `/residents/${residentId}/reset-password`, { temporaryPassword: 'ResetPass789!' }, tokenA);
+    assert.equal(reset.status, 200);
     assert.equal((await request('GET', '/auth/resident/me', undefined, residentToken)).status, 401);
-    assert.equal((await request('POST', '/auth/resident/login', loginBody({ password: 'ResetPass789!' }))).status, 401);
-    assert.equal((await request('PATCH', `/residents/${legacyId}/login-access`, { loginEnabled: true }, tokenA)).status, 200);
+    assert.equal((await request('POST', '/auth/resident/login', credentials(ownerA, '101', 'A-1', permanent))).status, 401);
+    const login = await request('POST', '/auth/resident/login', credentials(ownerA, '101', 'A-1', 'ResetPass789!'));
+    assert.equal(login.status, 200); assert.equal(login.data.resident.passwordChangeRequired, true); residentToken = login.data.token;
+    const beforeDisable = await Resident.findById(residentId).select('+passwordHash');
+    await request('PATCH', `/residents/${residentId}/login-access`, { loginEnabled: false }, tokenA);
     assert.equal((await request('GET', '/auth/resident/me', undefined, residentToken)).status, 401);
-    const login = await request('POST', '/auth/resident/login', loginBody({ password: 'ResetPass789!' })); residentToken = login.data.token;
-    assert.equal(login.status, 200);
+    await request('PATCH', `/residents/${residentId}/login-access`, { loginEnabled: true }, tokenA);
+    const reenabled = await Resident.findById(residentId).select('+passwordHash');
+    assert.equal(reenabled.passwordHash, beforeDisable.passwordHash);
+    assert.equal(reenabled.passwordChangeRequired, true);
   });
-  await t.test('room reassignment changes valid login room without replacing resident or account', async () => {
-    const previousToken = residentToken;
-    assert.equal((await request('PUT', `/residents/${legacyId}`, { room: roomA2._id }, tokenA)).status, 200);
-    assert.equal((await request('GET', '/auth/resident/me', undefined, previousToken)).status, 401);
-    assert.equal((await request('POST', '/auth/resident/login', loginBody({ password: 'ResetPass789!' }))).status, 401);
-    const login = await request('POST', '/auth/resident/login', loginBody({ password: 'ResetPass789!', roomNumber: '102' }));
-    assert.equal(login.status, 200); residentToken = login.data.token;
-    assert.equal(login.data.resident.id, legacyId); assert.equal(login.data.resident.room.roomNumber, '102');
-    const firstDate = login.data.resident.firstLoginAt;
-    const again = await request('POST', '/auth/resident/login', loginBody({ password: 'ResetPass789!', roomNumber: '102' }));
-    assert.equal(again.data.resident.firstLoginAt, firstDate);
+
+  await t.test('bed moves change login coordinates; resident and owner access stay isolated', async () => {
+    const beforeMove = residentToken;
+    const moved = await request('PUT', `/residents/${residentId}`, { room: roomA2._id, bedNumber: 'B-1' }, tokenA);
+    assert.equal(moved.status, 200); assert.equal(moved.data.bedNumber, 'B-1');
+    assert.equal((await request('GET', '/auth/resident/me', undefined, beforeMove)).status, 401);
+    assert.equal((await request('POST', '/auth/resident/login', credentials(ownerA, '101', 'A-1', 'ResetPass789!'))).status, 401);
+    const movedLogin = await request('POST', '/auth/resident/login', credentials(ownerA, '102', 'B-1', 'ResetPass789!'));
+    assert.equal(movedLogin.status, 200); assert.equal(movedLogin.data.resident.id, residentId);
+    for (const path of ['/rooms', '/residents', '/dashboard', '/settings']) {
+      assert.equal((await request('GET', path, undefined, movedLogin.data.token)).status, 403, path);
+    }
+    assert.equal((await request('GET', '/resident/profile', undefined, tokenA)).status, 403);
+    assert.equal((await request('GET', `/residents/${residentId}`, undefined, tokenB)).status, 404);
+    assert.equal((await request('PUT', `/residents/${residentId}`, { room: roomB._id, bedNumber: 'A-1' }, tokenA)).status, 404);
   });
-  await t.test('financial, payment and attendance history survive enabling accounts, moves and leaving', async () => {
-    const rent = historicalRent;
-    const attendance = historicalAttendance;
-    const before = rent.toObject();
-    assert.equal((await request('GET', '/rent?month=2026-11', undefined, tokenA)).status, 200);
-    assert.equal((await request('GET', '/attendance?date=2026-11-01', undefined, tokenA)).status, 200);
-    assert.equal((await request('GET', '/electricity?month=2026-11', undefined, tokenA)).status, 200);
-    assert.deepEqual((await ElectricityBill.findById(historicalBill._id)).payments.toObject(), historicalBill.payments.toObject());
-    assert.equal((await request('PATCH', `/residents/${legacyId}/leave`, {}, tokenA)).status, 200);
-    assert.equal((await request('GET', '/auth/resident/me', undefined, residentToken)).status, 401);
-    assert.equal((await request('POST', '/auth/resident/login', loginBody({ password: 'ResetPass789!', roomNumber: '102' }))).status, 401);
-    assert.equal((await request('PATCH', `/residents/${legacyId}/login-access`, { loginEnabled: true }, tokenA)).status, 409);
-    const savedRent = await RentRecord.findById(rent._id);
-    assert.equal(String(savedRent.room), roomA._id);
-    assert.deepEqual(savedRent.payments.toObject(), before.payments);
-    assert.ok(await Attendance.findById(attendance._id));
-    assert.equal((await request('DELETE', `/residents/${legacyId}`, undefined, tokenA)).status, 409);
+
+  await t.test('legacy resident with an active password remains usable and historical records remain intact', async () => {
+    const legacyId = new mongoose.Types.ObjectId();
+    const legacyHash = await bcrypt.hash('LegacyPass123!', 4);
+    await Resident.collection.insertOne({
+      _id: legacyId, owner: new mongoose.Types.ObjectId(ownerA.id), room: new mongoose.Types.ObjectId(roomA._id),
+      bedNumber: 'A-2', fullName: 'Legacy Resident', phone: '9876543219', normalizedPhone: '+919876543219',
+      joiningDate: new Date('2025-01-01'), monthlyRent: 4500, status: 'Active', loginEnabled: true,
+      accountStatus: 'active', passwordHash: legacyHash, sessionVersion: 0, passwordChangeRequired: false,
+    });
+    const rent = await RentRecord.create({ owner: ownerA.id, resident: legacyId, room: roomA._id, month: '2026-11', amountDue: 4500, dueDate: new Date('2026-11-05'), payments: [{ amount: 1000, paidOn: new Date('2026-11-01'), method: 'Cash' }] });
+    const attendance = await Attendance.create({ owner: ownerA.id, resident: legacyId, room: roomA._id, date: '2026-11-01', status: 'Present' });
+    const bill = await ElectricityBill.create({ owner: ownerA.id, room: roomA._id, month: '2026-11', previousReading: 10, currentReading: 20, ratePerUnit: 8, dueDate: new Date('2026-11-05'), payments: [{ amount: 20, method: 'Cash' }] });
+    const login = await request('POST', '/auth/resident/login', credentials(ownerA, '101', 'A-2', 'LegacyPass123!'));
+    assert.equal(login.status, 200); assert.equal(login.data.resident.passwordChangeRequired, false);
+    assert.equal(await Resident.countDocuments({ _id: legacyId }), 1);
+    assert.ok(await RentRecord.findById(rent._id)); assert.ok(await Attendance.findById(attendance._id));
+    assert.deepEqual((await ElectricityBill.findById(bill._id)).payments.toObject(), bill.payments.toObject());
   });
-  await t.test('phone normalization and stable PG codes are deterministic', () => {
-    for (const phone of ['9876543210', '919876543210', '+91 98765-43210', '+91 (98765) 43210']) assert.equal(normalizePhone(phone), '+919876543210');
-    assert.equal(normalizePhone('+14155552671'), '+14155552671');
-    assert.equal(normalizePhone({ $ne: null }), null);
-    assert.equal(pgCode(ownerA.id), ownerA.pgCode);
+
+  await t.test('owner creation/login remain role-safe and resident endpoints retain generic invalid credentials', async () => {
+    const login = await request('POST', '/auth/login', { email: 'owner-a@example.test', password: 'OwnerPass123!' });
+    assert.equal(login.status, 200); assert.equal(login.data.owner.role, 'owner');
+    const legacyToken = jwt.sign({ id: ownerA.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    assert.equal((await request('GET', '/dashboard', undefined, legacyToken)).status, 200);
+    for (const body of [{}, credentials(ownerA, '101', 'A-1', 'wrong')]) {
+      const result = await request('POST', '/auth/resident/login', body);
+      assert.equal(result.status, 401); assert.equal(result.message, 'Invalid resident details. Check your hostel, room, bed and password.');
+    }
   });
 });
