@@ -10,6 +10,8 @@ const roomSchema = new mongoose.Schema(
     amenities: { type: [{ type: String, trim: true, maxlength: 60 }], default: undefined },
     monthlyRent: { type: Number, required: [true, 'Monthly rent is required'], min: 0 },
     capacity: { type: Number, required: true, min: 1, default: 1 },
+    // Missing/empty beds keep legacy rooms usable until the owner configures them.
+    bedNumbers: { type: [{ type: String, trim: true, maxlength: 20 }], default: undefined },
     // Latest meter reading entered; used as "previous reading" for the next bill
     lastMeterReading: { type: Number, default: 0, min: 0 },
     notes: { type: String, trim: true },

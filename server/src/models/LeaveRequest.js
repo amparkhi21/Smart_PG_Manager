@@ -20,6 +20,7 @@ const leaveRequestSchema = new mongoose.Schema({
   residentName: { type: String, required: true, maxlength: 80, immutable: true },
   room: { type: mongoose.Schema.Types.ObjectId, ref: 'Room', required: true, immutable: true },
   roomNumber: { type: String, required: true, immutable: true },
+  bedNumber: { type: String, maxlength: 20, default: null, immutable: true },
   fromDate: { type: String, required: true, immutable: true, validate: isRealDate },
   toDate: { type: String, required: true, immutable: true, validate: isRealDate },
   durationDays: { type: Number, required: true, min: 1, max: 365, immutable: true },

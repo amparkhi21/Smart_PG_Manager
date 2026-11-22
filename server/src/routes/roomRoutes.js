@@ -14,6 +14,8 @@ const rules = (isUpdate) => {
     f(body('roomNumber')).trim().notEmpty().withMessage('Room number is required').isLength({ max: 20 }),
     f(body('monthlyRent')).isFloat({ min: 0 }).withMessage('Monthly rent must be 0 or more').toFloat(),
     f(body('capacity')).isInt({ min: 1, max: 20 }).withMessage('Capacity must be between 1 and 20').toInt(),
+    body('bedNumbers').optional().isArray({ max: 20 }).withMessage('Enter up to 20 beds'),
+    body('bedNumbers.*').isString().bail().trim().notEmpty().isLength({ max: 20 }).withMessage('Bed numbers must be 1 to 20 characters'),
     body('floor').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
     body('roomType').optional().isString().bail().trim().isLength({ max: 40 }),
     body('airConditioning').optional({ nullable: true }).isIn(['AC', 'Non-AC']),

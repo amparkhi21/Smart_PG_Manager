@@ -1,16 +1,15 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../ui/Modal.jsx';
 import ErrorState from '../ui/ErrorState.jsx';
 import Skeleton from '../ui/Skeleton.jsx';
 import StatusBadge from '../ui/StatusBadge.jsx';
-import ComplaintDetails from '../complaints/ComplaintDetails.jsx';
+import RequestDetailsModal from '../requests/RequestDetailsModal.jsx';
 import { formatCurrency, formatDate, formatDateTime, formatMonth } from '../../utils/format.js';
 
 export default function NotificationDetails({ related, ownerView, onClose, onRetry, onUpdated }) {
-  const navigate = useNavigate(), [revision, setRevision] = useState(0);
+  const navigate = useNavigate();
   const { record, target } = related;
-  if (target?.kind === 'complaint') return <ComplaintDetails key={target.id} id={target.id} ownerView={ownerView} revision={revision} onClose={onClose} onUpdated={() => { setRevision((value) => value + 1); onUpdated(); }} />;
+  if (target?.kind === 'complaint') return <RequestDetailsModal key={target.id} item={record} ownerView={ownerView} onClose={onClose} onChanged={onUpdated} />;
   const title = related.loading ? 'Opening notification' : target ? ({ room: 'Room change request', leave: 'Leave request details', payment: 'Payment claim details', notice: 'PG notice', bill: 'Bill details' })[target.kind] : 'Related item unavailable';
   return <Modal title={title} onClose={onClose} size="lg">
     {related.loading ? <div role="status" aria-label="Loading related item"><Skeleton className="h-56" /></div> : related.error ? <ErrorState message={related.error} onRetry={onRetry} /> : <div className="space-y-4 break-words [overflow-wrap:anywhere]">

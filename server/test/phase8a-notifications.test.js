@@ -96,7 +96,7 @@ test('Phase 8A private notifications, business events and durable retry on dispo
     assert.equal(result.status, 201); complaint = result.data;
     const created = await notificationsFor(complaint.id, 'complaint_created'); assert.equal(created.length, 1);
     assert.equal(String(created[0].owner), String(owner._id)); assert.equal(String(created[0].recipient), String(owner._id)); assert.equal(created[0].recipientRole, 'owner');
-    assert.equal(created[0].path, '/complaints'); assert.equal(created[0].readAt, null); assert.ok(created[0].createdAt instanceof Date);
+    assert.equal(created[0].path, '/requests'); assert.equal(created[0].readAt, null); assert.ok(created[0].createdAt instanceof Date);
     assert.equal(await count(residentToken), 0); assert.equal(await count(peerToken), 0); assert.equal(await count(otherToken), 0);
     const foreignResult = await request('POST', '/resident/complaints', { ...complaintDraft, title: 'FOREIGN PRIVATE COMPLAINT' }, foreignToken);
     assert.equal(foreignResult.status, 201); foreignComplaint = foreignResult.data;

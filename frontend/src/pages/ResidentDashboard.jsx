@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Building2, DoorOpen, CalendarDays, RefreshCw } from 'lucide-react';
+import { Building2, DoorOpen, CalendarDays, RefreshCw, ClipboardList } from 'lucide-react';
 import api from '../api/client.js';
 import useFetch from '../hooks/useFetch.js';
 import { formatCurrency, formatDate, formatMonth } from '../utils/format.js';
@@ -35,6 +35,6 @@ export default function ResidentDashboard() {
       {attendance.recordedDays === 0 && <p className="mt-5 text-sm text-slate-500">No attendance has been recorded for you this month.</p>}
     </section>
     <section className="card p-5 sm:p-7"><div className="mb-6 flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-bold text-navy-900">Account information</h2><div className="flex flex-wrap gap-4"><Link to="/resident/profile" className="text-sm font-semibold text-teal-700">My Profile</Link><Link to="/resident/change-password" className="text-sm font-semibold text-teal-700">Change password</Link></div></div><ResidentDetails resident={resident} /></section>
-    <section className="rounded-2xl border border-teal-100 bg-teal-50 p-5"><h2 className="font-bold text-teal-900">More services are coming soon</h2><p className="mt-2 text-sm leading-relaxed text-teal-800">Mess menus, complaints, leave requests, and other hostel services will be available in future updates. Contact your PG owner for assistance.</p></section>
+    <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-teal-100 bg-teal-50 p-5"><div><h2 className="font-bold text-teal-900">Need help from your PG owner?</h2><p className="mt-2 text-sm leading-relaxed text-teal-800">Submit a payment verification, room or bed change, leave, maintenance, private or general request.</p></div><Link to="/resident/requests" className="btn-primary"><ClipboardList size={16} />My Requests</Link></section>
   </div>;
 }

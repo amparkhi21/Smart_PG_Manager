@@ -86,6 +86,24 @@ export const listMyClaims = asyncHandler(async (req, res) => {
   res.json({ success: true, count: claims.length, data: claims.map(residentClaimView) });
 });
 
+export const cancelMyClaim = asyncHandler(async (req, res) => {
+  const now = new Date(), owner = req.resident.owner;
+  const claim = await PaymentClaim.findOneAndUpdate({
+    _id: req.params.id, owner, resident: req.resident._id, status: PENDING,
+  }, {
+    $set: { status: 'Cancelled', reviewedAt: now },
+    $push: { notificationEvents: notificationEvent('payment_cancelled', req.params.id, owner,
+      'Payment claim cancelled', `${req.resident.fullName} cancelled a pending payment verification claim.`) },
+  }, { new: true });
+  if (!claim) {
+    const existing = await PaymentClaim.findOne({ _id: req.params.id, owner, resident: req.resident._id }).select('status');
+    if (!existing) throw new ApiError(404, 'Payment claim not found');
+    throw new ApiError(409, 'Only pending payment claims can be cancelled');
+  }
+  await tryDeliverNotifications(owner);
+  res.json({ success: true, message: 'Payment claim cancelled. The bill balance was not changed.', data: residentClaimView(claim) });
+});
+
 export const submitClaim = asyncHandler(async (req, res) => {
   const resident = req.resident, { billType, billId, month } = req.body;
   const amount = round2(req.body.amount), utr = String(req.body.utr).trim().toUpperCase();

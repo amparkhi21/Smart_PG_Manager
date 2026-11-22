@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
 
 export const NOTIFICATION_TARGETS = {
-  complaint_created: ['owner', '/complaints'],
-  complaint_status_updated: ['resident', '/resident/complaints'],
-  complaint_response: ['resident', '/resident/complaints'],
+  complaint_created: ['owner', '/requests'],
+  complaint_status_updated: ['resident', '/resident/requests'],
+  complaint_response: ['resident', '/resident/requests'],
   room_change_requested: ['owner', '/room-change-requests'],
   room_change_approved: ['resident', '/resident/room-change-requests'],
   room_change_rejected: ['resident', '/resident/room-change-requests'],

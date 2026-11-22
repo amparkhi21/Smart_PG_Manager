@@ -5,6 +5,8 @@ const ownerSchema = new mongoose.Schema(
   {
     role: { type: String, enum: ['owner'], default: 'owner', immutable: true },
     occupancyRevision: { type: Number, select: false },
+    occupancyLockToken: { type: String, select: false },
+    occupancyLockExpiresAt: { type: Date, select: false },
     name: { type: String, required: [true, 'Name is required'], trim: true, maxlength: 80 },
     email: {
       type: String,
@@ -15,6 +17,9 @@ const ownerSchema = new mongoose.Schema(
       match: [/^\S+@\S+\.\S+$/, 'Enter a valid email'],
     },
     password: { type: String, required: true, minlength: 8, select: false },
+    // PG joining credentials are separate from owner login and resident sessions.
+    pgJoiningPasswordHash: { type: String, select: false },
+    pgJoiningPasswordUpdatedAt: { type: Date },
     phone: { type: String, trim: true },
     pgName: { type: String, required: [true, 'PG name is required'], trim: true, maxlength: 100 },
     upiId: { type: String, trim: true, maxlength: 320, default: '' },

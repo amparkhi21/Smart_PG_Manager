@@ -51,6 +51,7 @@ test('Phase 1 authentication and legacy workflows on disposable MongoDB', { time
     return { status: response.status, ...data };
   };
   let ownerA, ownerB, tokenA, tokenB, roomA, roomA2, roomB, residentA, residentB, legacyId, residentToken, beforeReset;
+  let joinRoom, joiningResident;
   let historicalRent, historicalAttendance, historicalBill;
   const temp = 'Temporary123!';
   const permanent = 'Personal456!';
@@ -86,6 +87,97 @@ test('Phase 1 authentication and legacy workflows on disposable MongoDB', { time
     assert.equal((await request('GET', `/rooms/${roomA._id}`, undefined, tokenB)).status, 404);
     assert.equal((await request('GET', '/rooms', undefined, tokenA)).data.length, 2);
     assert.equal((await request('GET', '/dashboard', undefined, tokenA)).status, 200);
+  });
+  await t.test('PG password, assigned beds and single-use resident activation stay private and tenant-scoped', async () => {
+    joinRoom = (await request('POST', '/rooms', {
+      roomNumber: '201', capacity: 2, monthlyRent: 5500,
+    }, tokenA)).data;
+    const created = await request('POST', '/residents', {
+      room: joinRoom._id, fullName: 'Joining Student', phone: '9876543213', monthlyRent: 5500,
+    }, tokenA);
+    assert.equal(created.status, 201);
+    assert.equal(created.data.bedNumber, undefined);
+    assert.equal((await request('PUT', `/rooms/${joinRoom._id}`, { bedNumbers: ['A-1', 'A-2'] }, tokenA)).status, 200);
+    const stillUnassigned = await Resident.findById(created.data._id);
+    assert.equal(stillUnassigned.bedNumber, undefined);
+    const assigned = await request('PUT', `/residents/${created.data._id}`, { bedNumber: 'A-1' }, tokenA);
+    assert.equal(assigned.status, 200);
+    joiningResident = assigned.data;
+    assert.equal(joiningResident.accountStatus, 'unconfigured');
+    assert.equal(joiningResident.bedNumber, 'A-1');
+
+    const duplicateBed = await request('POST', '/residents', {
+      room: joinRoom._id, bedNumber: 'A-1', fullName: 'Duplicate Bed Student', phone: '9876543214',
+    }, tokenA);
+    assert.equal(duplicateBed.status, 409);
+
+    for (const token of [tokenA, tokenB]) {
+      assert.equal((await request('PUT', '/settings/pg-access/password', { password: 'JoiningPass123!' }, token)).status, 200);
+    }
+    const status = await request('GET', '/settings/pg-access', undefined, tokenA);
+    assert.equal(status.data.configured, true);
+    assert.doesNotMatch(JSON.stringify(status.data), /JoiningPass123|pgJoiningPasswordHash|\$2[aby]\$/);
+    const ownerStored = await Owner.findById(ownerA.id).select('+pgJoiningPasswordHash');
+    assert.notEqual(ownerStored.pgJoiningPasswordHash, 'JoiningPass123!');
+    assert.equal(await bcrypt.compare('JoiningPass123!', ownerStored.pgJoiningPasswordHash), true);
+
+    const joinDetails = { pgName: 'Shared Hostel', pgJoiningPassword: 'JoiningPass123!', roomNumber: '201', bedNumber: 'A-1' };
+    const ambiguous = await request('POST', '/auth/resident/join/verify', joinDetails);
+    assert.equal(ambiguous.status, 409);
+    assert.equal(ambiguous.data.requiresPgCode, true);
+    assert.deepEqual(new Set(ambiguous.data.pgCodes), new Set([ownerA.pgCode, ownerB.pgCode]));
+    const verified = await request('POST', '/auth/resident/join/verify', { ...joinDetails, pgCode: ownerA.pgCode });
+    assert.equal(verified.status, 200);
+    assert.doesNotMatch(JSON.stringify(verified.data), /Joining Student|9876543213/);
+    const challenge = verified.data.challenge;
+
+    const invitation = await request('POST', '/settings/activation-invitations', { residentId: joiningResident._id, expiresInDays: 7 }, tokenA);
+    assert.equal(invitation.status, 201);
+    const code = invitation.data.code;
+    const storedResident = await Resident.findById(joiningResident._id).select('+activationInvitations');
+    assert.notEqual(storedResident.activationInvitations[0].codeHash, code);
+    const listed = await request('GET', '/settings/activation-invitations', undefined, tokenA);
+    assert.equal(listed.data.invitations[0].status, 'Pending');
+    assert.doesNotMatch(JSON.stringify(listed.data), /codeHash|Joining Student.*9876543213/);
+    assert.equal((await request('POST', '/auth/resident/join/activate', {
+      challenge, activationCode: 'X'.repeat(43), password: 'PersonalPass456!',
+    })).status, 401);
+    const activated = await request('POST', '/auth/resident/join/activate', {
+      challenge, activationCode: code, password: 'PersonalPass456!',
+    });
+    assert.equal(activated.status, 200);
+    assert.equal(activated.data.resident.passwordChangeRequired, false);
+    const joiningToken = activated.data.token;
+    assert.equal((await request('GET', '/auth/resident/me', undefined, joiningToken)).status, 200);
+    assert.equal((await request('POST', '/auth/resident/join/activate', {
+      challenge, activationCode: code, password: 'AnotherPass456!',
+    })).status, 401);
+
+    assert.equal((await request('PUT', '/settings/pg-access/password', { password: 'UpdatedJoiningPass123!' }, tokenA)).status, 200);
+    assert.equal((await request('GET', '/auth/resident/me', undefined, joiningToken)).status, 200);
+    const returning = await request('POST', '/auth/resident/login', {
+      pgName: 'Shared Hostel', pgCode: ownerA.pgCode, phone: '9876543213', password: 'PersonalPass456!',
+    });
+    assert.equal(returning.status, 200);
+    assert.equal((await request('POST', '/settings/activation-invitations', { residentId: joiningResident._id }, tokenB)).status, 404);
+
+    const secondResident = await request('POST', '/residents', {
+      room: joinRoom._id, bedNumber: 'A-2', fullName: 'Revoked Student', phone: '9876543215',
+    }, tokenA);
+    assert.equal(secondResident.status, 201);
+    const secondInvitation = await request('POST', '/settings/activation-invitations', { residentId: secondResident.data._id }, tokenA);
+    const secondChallenge = await request('POST', '/auth/resident/join/verify', {
+      pgName: 'Shared Hostel', pgCode: ownerA.pgCode, pgJoiningPassword: 'UpdatedJoiningPass123!', roomNumber: '201', bedNumber: 'A-2',
+    });
+    assert.equal(secondChallenge.status, 200);
+    assert.equal((await request('PATCH', '/settings/activation-invitations/revoke', {
+      residentId: secondResident.data._id, invitationId: secondInvitation.data.invitation.id,
+    }, tokenA)).status, 200);
+    assert.equal((await request('POST', '/auth/resident/join/activate', {
+      challenge: secondChallenge.data.challenge, activationCode: secondInvitation.data.code, password: 'PersonalPass789!',
+    })).status, 401);
+    await Resident.deleteMany({ _id: { $in: [joiningResident._id, secondResident.data._id] } });
+    await Room.deleteOne({ _id: joinRoom._id });
   });
   await t.test('legacy resident documents with duplicate phones survive and can be edited', async () => {
     const result = await Resident.collection.insertOne({ owner: new mongoose.Types.ObjectId(ownerA.id), room: new mongoose.Types.ObjectId(roomA._id), fullName: 'Legacy Resident', phone: '9876543210', joiningDate: new Date('2025-01-01'), monthlyRent: 4500, status: 'Active' });
