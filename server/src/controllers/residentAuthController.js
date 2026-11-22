@@ -35,10 +35,11 @@ export const residentLogin = asyncHandler(async (req, res) => {
     roomNumber: new RegExp(`^${escapeRegex(roomNumber.trim())}$`, 'i'),
     bedNumbers: new RegExp(`^${escapeRegex(bedNumber.trim())}$`, 'i'),
   }) : null;
-  const resident = owner && room ? await Resident.findOne({
-    owner: owner._id, room: room._id,
+  const matches = owner && room ? await Resident.find({
+    owner: owner._id, room: room._id, status: 'Active',
     bedNumber: new RegExp(`^${escapeRegex(bedNumber.trim())}$`, 'i'),
-  }).select('+passwordHash') : null;
+  }).select('+passwordHash').limit(2) : [];
+  const resident = matches.length === 1 ? matches[0] : null;
   const passwordValid = await bcrypt.compare(password, resident?.passwordHash || dummyHash);
   if (!resident || !passwordValid || !resident.loginEnabled || resident.accountStatus !== 'active'
       || resident.status !== 'Active' || !room || String(resident.room) !== String(room._id)
