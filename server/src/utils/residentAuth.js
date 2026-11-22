@@ -46,6 +46,7 @@ export function publicResident(resident, owner, room) {
     status: resident.status, loginEnabled: resident.loginEnabled,
     accountStatus: resident.accountStatus, firstLoginAt: resident.firstLoginAt || null,
     lastLoginAt: resident.lastLoginAt || null, passwordChangeRequired: resident.passwordChangeRequired,
+    bedNumber: resident.bedNumber || null,
     pgName: owner.pgName, pgCode: pgCode(owner._id),
     room: { id: room._id, roomNumber: room.roomNumber },
   };

@@ -8,6 +8,11 @@ const pendingRequest = () => ({ id: '555555555555555555555555', fromRoom: { id: 
 
 async function mockApi(page, { pending = false, fullOnSubmit = false } = {}) {
   const state = { requests: pending ? [pendingRequest()] : [], room: { ...resident.room }, submissions: [], decisions: [], fullOnSubmit };
+  const unified = (request) => ({ id: `room-change:${request.id}`, sourceType: 'room-change', sourceId: request.id,
+    category: 'Room / Bed Change', title: `Move to room ${request.toRoom.roomNumber}`, description: request.reason, priority: 'Normal',
+    status: request.status, createdAt: request.createdAt, ownerResponse: request.decisionNote || '',
+    resident: { id: resident.id, name: resident.fullName }, room: { number: request.fromRoom.roomNumber, bedNumber: null },
+    details: { fromRoom: request.fromRoom.roomNumber, fromBed: null, toRoom: request.toRoom.roomNumber, toBed: null } });
   await page.route((url) => url.origin === 'http://127.0.0.1:4179' && url.pathname.startsWith('/api/'), async (route) => {
     const req = route.request(), url = new URL(req.url()), path = url.pathname.slice(4);
     const ownerSession = req.headers().authorization?.includes('owner-token');
@@ -20,9 +25,17 @@ async function mockApi(page, { pending = false, fullOnSubmit = false } = {}) {
       state.submissions.push(req.postDataJSON()); state.requests.push(pendingRequest());
       return reply(state.requests.at(-1), 201, 'Room change requested');
     }
-    if ((path === '/resident/room-change-requests' || path === '/room-change-requests') && req.method() === 'GET') {
-      const status = url.searchParams.get('status');
-      return reply({ requests: state.requests.filter((request) => !status || request.status === status) });
+    if (path === '/residents' && req.method() === 'GET') return reply([]);
+    if ((path === '/requests' || path === '/resident/requests') && req.method() === 'GET') {
+      const status = url.searchParams.get('status'), category = url.searchParams.get('category');
+      const requests = state.requests.filter((request) => (!status || request.status === status) && (!category || category === 'Room / Bed Change')).map(unified);
+      const pageNumber = Number(url.searchParams.get('page') || 1), limit = Number(url.searchParams.get('limit') || 20);
+      return reply({ requests: requests.slice((pageNumber - 1) * limit, pageNumber * limit), pagination: { page: pageNumber, limit, total: requests.length, totalPages: Math.ceil(requests.length / limit), hasMore: pageNumber * limit < requests.length } });
+    }
+    const detailsMatch = path.match(/^(?:\/resident)?\/requests\/room-change\/([^/]+)$/);
+    if (detailsMatch && req.method() === 'GET') {
+      const request = state.requests.find((item) => item.id === detailsMatch[1]);
+      return request ? reply(unified(request)) : reply('Request not found', 404);
     }
     if (path.startsWith('/room-change-requests/') && req.method() === 'PATCH') {
       const body = req.postDataJSON(); state.decisions.push(body);
@@ -52,17 +65,24 @@ test('Phase 2B resident requests a vacant room, owner approves, resident sees th
   await expect(dialog.getByLabel('New room', { exact: true })).toHaveValue(target.id);
   await dialog.getByLabel('Reason for room change', { exact: true }).fill('A quieter room for studying');
   await dialog.getByRole('button', { name: 'Submit request', exact: true }).click();
-  await expect(page).toHaveURL(/\/resident\/room-change-requests$/);
+  await expect(page).toHaveURL(/\/resident\/requests$/);
   await expect(page.locator('article').getByText('Pending', { exact: true })).toBeVisible();
+  await expect.poll(() => state.submissions.length).toBe(1);
   expect(state.submissions).toEqual([{ targetRoom: target.id, reason: 'A quieter room for studying' }]);
-  await switchSession(page, 'owner-token', '/room-change-requests');
-  await expect(page.getByRole('heading', { name: 'Resident A', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Approve', exact: true }).click();
-  await page.getByRole('dialog').getByLabel('Owner response', { exact: true }).fill('Move confirmed');
-  await page.getByRole('dialog').getByRole('button', { name: 'Confirm approval', exact: true }).click();
+  await switchSession(page, 'owner-token', '/requests');
+  const ownerCard = page.getByRole('article');
+  await ownerCard.getByRole('button', { name: 'Details', exact: true }).click();
+  const decisionDialog = page.getByRole('dialog', { name: 'Request details', exact: true });
+  await expect(decisionDialog.getByText('Resident A · Room 101', { exact: true })).toBeVisible();
+  await decisionDialog.getByRole('button', { name: 'Approve', exact: true }).click();
+  await decisionDialog.getByLabel('Reply or reason (optional)', { exact: true }).fill('Move confirmed');
+  const approvalResponse = page.waitForResponse((response) => response.request().method() === 'PATCH' && new URL(response.url()).pathname === `/api/room-change-requests/${pendingRequest().id}/decision`);
+  await decisionDialog.getByRole('button', { name: 'Confirm approved', exact: true }).click();
+  await approvalResponse;
   await expect.poll(() => state.decisions.length).toBe(1);
   expect(state.decisions[0]).toEqual({ decision: 'Approved', decisionNote: 'Move confirmed' });
-  await switchSession(page, 'resident-token', '/resident/room-change-requests');
+  await expect(ownerCard.getByText('Approved', { exact: true })).toBeVisible();
+  await switchSession(page, 'resident-token', '/resident/requests');
   await expect(page.locator('article').getByText('Approved', { exact: true })).toBeVisible();
   await expect(page.getByText('Owner response: Move confirmed', { exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'My Room', exact: true }).click();
@@ -71,7 +91,7 @@ test('Phase 2B resident requests a vacant room, owner approves, resident sees th
   expect(await page.evaluate(() => localStorage.getItem('pg_token'))).toBe('resident-token');
   await page.setViewportSize({ width: 360, height: 800 });
   await page.getByRole('button', { name: 'Open navigation' }).click();
-  await page.getByRole('navigation', { name: 'Resident navigation' }).getByRole('link', { name: 'Room Change Requests', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Resident navigation' }).getByRole('link', { name: 'My Requests', exact: true }).click();
   await expect(page.locator('article').getByText('Approved', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
@@ -90,13 +110,17 @@ test('Phase 2B resident handles a room becoming full without losing the session 
 
 test('Phase 2B owner rejects with a reason and does not change the room', async ({ page }) => {
   const state = await mockApi(page, { pending: true });
-  await initialSession(page, 'owner-token', '/room-change-requests');
-  await page.getByRole('button', { name: 'Reject', exact: true }).click();
-  await page.getByRole('dialog').getByLabel('Owner response', { exact: true }).fill('Room reserved for maintenance');
-  await page.getByRole('dialog').getByRole('button', { name: 'Confirm rejection', exact: true }).click();
+  await initialSession(page, 'owner-token', '/requests');
+  await page.getByRole('article').getByRole('button', { name: 'Details', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Request details', exact: true });
+  await dialog.getByRole('button', { name: 'Reject', exact: true }).click();
+  await dialog.getByLabel('Reply or reason (optional)', { exact: true }).fill('Room reserved for maintenance');
+  const rejectionResponse = page.waitForResponse((response) => response.request().method() === 'PATCH' && new URL(response.url()).pathname === `/api/room-change-requests/${pendingRequest().id}/decision`);
+  await dialog.getByRole('button', { name: 'Confirm rejected', exact: true }).click();
+  await rejectionResponse;
   await expect.poll(() => state.decisions.length).toBe(1);
   expect(state.decisions[0].decision).toBe('Rejected');
   expect(state.room.id).toBe(source.id);
-  await page.getByLabel('Filter room change requests', { exact: true }).selectOption('Rejected');
+  await page.getByLabel('Filter by status', { exact: true }).selectOption('Rejected');
   await expect(page.getByText('Owner response: Room reserved for maintenance', { exact: true })).toBeVisible();
 });

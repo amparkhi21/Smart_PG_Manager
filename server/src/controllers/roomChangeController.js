@@ -6,12 +6,13 @@ import asyncHandler from '../utils/asyncHandler.js';
 import { withOccupancyTransaction } from '../utils/occupancyTransaction.js';
 import { notificationEvent } from '../models/notificationOutbox.js';
 import { tryDeliverNotifications } from '../utils/notifications.js';
+import { assertBedAvailable, resolveBedNumber } from '../utils/residentBeds.js';
 
 const view = (request, ownerView = false) => ({
-  id: request._id, fromRoom: { id: request.fromRoom, roomNumber: request.fromRoomNumber },
-  toRoom: { id: request.toRoom, roomNumber: request.toRoomNumber },
+  id: request._id, fromRoom: { id: request.fromRoom, roomNumber: request.fromRoomNumber, bedNumber: request.fromBedNumber || null },
+  toRoom: { id: request.toRoom, roomNumber: request.toRoomNumber, bedNumber: request.toBedNumber || null },
   reason: request.reason, status: request.status, createdAt: request.createdAt,
-  decisionNote: request.decisionNote || '', decidedAt: request.decidedAt || null,
+  decisionNote: request.decisionNote || '', decidedAt: request.decidedAt || null, cancelledAt: request.cancelledAt || null,
   ...(ownerView && { resident: { id: request.resident, fullName: request.residentName } }),
 });
 
@@ -29,10 +30,13 @@ export const createRoomChange = asyncHandler(async (req, res) => {
     if (!target) throw new ApiError(404, 'Room not found');
     const occupied = await Resident.countDocuments({ owner: resident.owner, room: target._id, status: 'Active' }).session(session);
     if (occupied >= target.capacity) throw new ApiError(409, 'This room is full. Choose another available room.');
+    const targetBedNumber = resolveBedNumber(target, req.body.targetBedNumber, { required: Boolean(target.bedNumbers?.length) });
+    await assertBedAvailable(resident.owner, target, targetBedNumber, resident._id, session);
     const current = await Room.findOne({ _id: resident.room, owner: resident.owner }).session(session);
     if (!current) throw new ApiError(409, 'Your room assignment has changed. Refresh and try again.');
     const request = new RoomChangeRequest({ owner: resident.owner, resident: resident._id, residentName: resident.fullName,
-      fromRoom: current._id, toRoom: target._id, fromRoomNumber: current.roomNumber, toRoomNumber: target.roomNumber, reason: req.body.reason });
+      fromRoom: current._id, toRoom: target._id, fromRoomNumber: current.roomNumber, toRoomNumber: target.roomNumber,
+      fromBedNumber: resident.bedNumber || null, toBedNumber: targetBedNumber || null, reason: req.body.reason });
     request.notificationEvents = [notificationEvent('room_change_requested', request._id, request.owner,
       'New room change request', `${request.residentName} requested a room change from ${request.fromRoomNumber} to ${request.toRoomNumber}.`)];
     await request.save({ session }); return request;
@@ -66,10 +70,23 @@ export const decideRoomChange = asyncHandler(async (req, res) => {
       if (!target) throw new ApiError(409, 'The requested room is no longer available');
       const occupied = await Resident.countDocuments({ owner: req.owner._id, room: target._id, status: 'Active' }).session(session);
       if (occupied >= target.capacity) throw new ApiError(409, 'The requested room is now full');
-      // Only the room changes. Tenant-bound sessions remain valid, so the resident
-      // can see the decision. Increment __v to protect concurrent account edits.
+      const targetBedNumber = resolveBedNumber(target, request.toBedNumber || '', { required: Boolean(target.bedNumbers?.length) });
+      await assertBedAvailable(req.owner._id, target, targetBedNumber, resident._id, session);
+      const now = new Date(), set = { room: target._id }, update = { $set: set, $inc: { __v: 1 } };
+      if (targetBedNumber) set.bedNumber = targetBedNumber;
+      else update.$unset = { bedNumber: 1 };
+      const bedAssignments = (resident.bedAssignments || []).map((assignment) => assignment.toObject());
+      if (resident.bedNumber) {
+        const openAssignment = [...bedAssignments].reverse().find((assignment) => !assignment.releasedAt);
+        if (openAssignment) openAssignment.releasedAt = now;
+        else bedAssignments.push({ room: request.fromRoom, roomNumber: request.fromRoomNumber, bedNumber: resident.bedNumber,
+          assignedAt: resident.updatedAt || resident.joiningDate || now, releasedAt: now });
+      }
+      if (targetBedNumber) bedAssignments.push({ room: target._id, roomNumber: target.roomNumber, bedNumber: targetBedNumber, assignedAt: now });
+      set.bedAssignments = bedAssignments;
+      // Keep the existing room-change session behavior while recording the bed history atomically.
       const moved = await Resident.updateOne({ _id: resident._id, owner: req.owner._id, room: request.fromRoom, status: 'Active' },
-        { $set: { room: target._id }, $inc: { __v: 1 } }, { session, runValidators: true });
+        update, { session, runValidators: true });
       if (!moved.matchedCount) throw new ApiError(409, 'The resident changed. Refresh and try again.');
     }
     request.status = decision; request.decisionNote = decisionNote;
@@ -80,4 +97,21 @@ export const decideRoomChange = asyncHandler(async (req, res) => {
   }, { required: true });
   await tryDeliverNotifications(request.owner);
   res.json({ success: true, message: decision === 'Approved' ? 'Room change approved. Existing rent and bills are unchanged.' : 'Room change rejected', data: view(request, true) });
+});
+
+export const cancelRoomChangeRequest = asyncHandler(async (req, res) => {
+  const request = await withOccupancyTransaction(req.resident.owner, async (session) => {
+    const request = await RoomChangeRequest.findOne({
+      _id: req.params.id, owner: req.resident.owner, resident: req.resident._id,
+    }).select('+notificationEvents').session(session);
+    if (!request) throw new ApiError(404, 'Room change request not found');
+    if (request.status !== 'Pending') throw new ApiError(409, 'Only pending room change requests can be cancelled');
+    request.status = 'Cancelled'; request.cancelledAt = new Date();
+    (request.notificationEvents ||= []).push(notificationEvent('room_change_cancelled', request._id, request.owner,
+      'Room change request cancelled', `${request.residentName} cancelled a pending room change request.`));
+    await request.save({ session });
+    return request;
+  }, { required: true });
+  await tryDeliverNotifications(request.owner);
+  res.json({ success: true, message: 'Room change request cancelled', data: view(request) });
 });

@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { notificationOutbox } from './notificationOutbox.js';
 
-export const CLAIM_STATUSES = ['Pending Verification', 'Approved', 'Rejected'];
+export const CLAIM_STATUSES = ['Pending Verification', 'Approved', 'Rejected', 'Cancelled'];
 export const BILL_TYPES = ['Rent', 'Electricity'];
 
 // A resident's *claim* that they paid. It is never proof of payment and changes no balance until
