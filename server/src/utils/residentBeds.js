@@ -1,5 +1,6 @@
 import Resident from '../models/Resident.js';
 import ApiError from './ApiError.js';
+import { escapeRegex } from './ownership.js';
 
 export function resolveBedNumber(room, value, { required = false } = {}) {
   const bedNumbers = room.bedNumbers || [];
@@ -19,7 +20,7 @@ export function resolveBedNumber(room, value, { required = false } = {}) {
 
 export async function assertBedAvailable(ownerId, room, bedNumber, excludeResidentId, session) {
   if (!bedNumber) return;
-  const filter = { owner: ownerId, room: room._id, bedNumber, status: 'Active' };
+  const filter = { owner: ownerId, room: room._id, bedNumber: new RegExp(`^${escapeRegex(bedNumber)}$`, 'i'), status: 'Active' };
   if (excludeResidentId) filter._id = { $ne: excludeResidentId };
   let query = Resident.exists(filter);
   if (session) query = query.session(session);
@@ -57,8 +58,8 @@ export function setResidentBed(resident, previousRoom, nextRoom, nextBedNumber) 
 
 export function validateBedNumbers(bedNumbers, capacity) {
   if (bedNumbers === undefined) return;
-  if (!Array.isArray(bedNumbers) || bedNumbers.length > 20 || bedNumbers.length > capacity) {
-    throw new ApiError(400, 'Bed count must not exceed room capacity');
+  if (!Array.isArray(bedNumbers) || bedNumbers.length > 20 || bedNumbers.length !== capacity) {
+    throw new ApiError(400, 'Configure exactly one bed number for each room capacity slot');
   }
   const normalized = bedNumbers.map((value) => typeof value === 'string' ? value.trim() : '');
   if (normalized.some((value) => !value || value.length > 20)) throw new ApiError(400, 'Enter bed numbers up to 20 characters each');

@@ -80,7 +80,7 @@ residentSchema.pre('save', function () {
     this.loginEnabled = false;
     if (this.accountStatus !== 'unconfigured') this.accountStatus = 'disabled';
   }
-  if (!this.isNew && ['passwordHash', 'loginEnabled', 'phone', 'status', 'room'].some((key) => this.isModified(key))) {
+  if (!this.isNew && ['passwordHash', 'loginEnabled', 'phone', 'status', 'room', 'bedNumber'].some((key) => this.isModified(key))) {
     this.sessionVersion = (this.sessionVersion || 0) + 1;
   }
 });

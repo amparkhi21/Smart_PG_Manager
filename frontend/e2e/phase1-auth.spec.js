@@ -8,7 +8,7 @@ async function mockAPI(page, { temporary = false, expired = false, outage = fals
   const state = { resident: { ...resident, passwordChangeRequired: temporary }, residentPassword: 'Temporary123!', expired, outage, writes: [], calls: [],
     rooms: [room], hostels: [{ id: owner.id, pgName: owner.pgName, address: '12 North Road, Jaipur' }],
     residents: [{ ...resident, _id: resident.id, room, monthlyRent: 5000, accountStatus: 'unconfigured', loginEnabled: false }],
-    residentQueries: [], creations: [], portalError: '',
+    residentQueries: [], creations: [], roomWrites: [], portalError: '',
     finance: { month: '2026-11', monthlyRent: 5000, pendingDues: 1250, paymentDueDate: '2026-11-05T18:29:59.000Z',
       currentBill: { amountDue: 5000, amountPaid: 3750, balance: 1250, dueDate: '2026-11-05T18:29:59.000Z', status: 'Partially Paid' } },
     attendance: { month: '2026-11', throughDate: '2026-11-19', Present: 17, Absent: 1, 'On Leave': 1, recordedDays: 19 } };
@@ -40,6 +40,11 @@ async function mockAPI(page, { temporary = false, expired = false, outage = fals
         ...(path === '/resident/dashboard' && { finance: state.finance, attendance: state.attendance }) });
     }
     if (path === '/rooms') return fulfill(state.rooms);
+    if (path.startsWith('/rooms/') && req.method() === 'PUT') {
+      const payload = req.postDataJSON(); state.roomWrites.push(payload);
+      const saved = state.rooms.find((item) => item._id === path.split('/')[2]);
+      Object.assign(saved, payload); return fulfill(saved);
+    }
     if (path === '/residents' && req.method() === 'GET') {
       const params = Object.fromEntries(new URL(req.url()).searchParams);
       state.residentQueries.push(params);
@@ -309,8 +314,21 @@ test('owner resident accounts can be added, reset, disabled and re-enabled throu
   await seedToken(page, 'owner-token'); await page.goto('/residents');
   await page.getByRole('button', { name: 'Add resident', exact: true }).click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByLabel('Room', { exact: true }).selectOption(room._id);
-  await dialog.getByLabel('Bed', { exact: true }).selectOption('1B');
+  const roomSelect = dialog.getByLabel('Room Number', { exact: true });
+  const bedSelect = dialog.getByLabel('Bed Number', { exact: true });
+  await expect(bedSelect).toBeVisible(); await expect(bedSelect).toBeDisabled();
+  await expect(bedSelect.locator('option:checked')).toHaveText('Select room first');
+  await roomSelect.selectOption(room._id);
+  await expect(bedSelect).toBeEnabled();
+  await dialog.getByRole('button', { name: 'Add resident', exact: true }).click();
+  await expect(dialog.getByText('Choose a bed in this room', { exact: true })).toBeVisible();
+  expect(state.creations).toHaveLength(0);
+  const [roomBox, bedBox] = await Promise.all([roomSelect.boundingBox(), bedSelect.boundingBox()]);
+  expect(roomBox.y).toBe(bedBox.y); expect(bedBox.x).toBeGreaterThan(roomBox.x);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const [mobileRoom, mobileBed] = await Promise.all([roomSelect.boundingBox(), bedSelect.boundingBox()]);
+  expect(mobileBed.y).toBeGreaterThan(mobileRoom.y);
+  await bedSelect.selectOption('1B');
   await dialog.getByLabel('Full name', { exact: true }).fill('New Resident');
   await dialog.getByLabel('Phone number', { exact: true }).fill('9876543211');
   await dialog.getByLabel('Email', { exact: true }).fill('new@example.test');
@@ -336,6 +354,86 @@ test('owner resident accounts can be added, reset, disabled and re-enabled throu
   await expect.poll(() => state.writes.length).toBe(2);
   expect(state.writes[1].loginEnabled).toBe(true);
   expect(state.writes[1]).not.toHaveProperty('temporaryPassword');
+});
+
+test('bed editing: a full room keeps the current bed selectable and blocks other residents beds', async ({ page }) => {
+  const state = await mockAPI(page);
+  const full = { ...room, capacity: 3, currentResidents: 3, bedNumbers: ['B1', 'B2', 'B3'] };
+  state.rooms = [full];
+  Object.assign(state.residents[0], { room: full, bedNumber: 'B1', accountStatus: 'active', loginEnabled: true });
+  state.residents.push(
+    { ...state.residents[0], _id: '444444444444444444444444', fullName: 'Roommate', bedNumber: 'B2' },
+    { ...state.residents[0], _id: '555555555555555555555555', fullName: 'Legacy Roommate', bedNumber: undefined },
+  );
+  await seedToken(page, 'owner-token'); await page.goto('/residents');
+  await page.getByRole('button', { name: 'Edit Test Resident', exact: true }).click();
+  const dialog = page.getByRole('dialog'), beds = dialog.getByLabel('Bed Number', { exact: true });
+  await expect(dialog.getByLabel('Room Number', { exact: true })).toHaveValue(room._id);
+  await expect(dialog.locator(`#room option[value="${room._id}"]`)).toBeEnabled();
+  await expect(beds).toHaveValue('B1'); await expect(beds.locator('option[value="B1"]')).toBeEnabled();
+  await expect(beds.locator('option[value="B2"]')).toBeDisabled();
+  await beds.selectOption('B3');
+  await dialog.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect.poll(() => state.writes.length).toBe(1);
+  expect(state.writes[0]).toMatchObject({ room: room._id, bedNumber: 'B3', monthlyRent: 5000, loginEnabled: true });
+  expect(state.writes[0]).not.toHaveProperty('temporaryPassword');
+  await expect(dialog).toHaveCount(0);
+  await page.getByRole('button', { name: 'Edit Test Resident', exact: true }).click();
+  await expect(page.getByLabel('Bed Number', { exact: true })).toHaveValue('B3');
+});
+
+test('bed editing: configure an occupied legacy room without losing unsaved resident details', async ({ page }) => {
+  const state = await mockAPI(page);
+  const legacyRoom = { ...room, roomNumber: '301', capacity: 1, currentResidents: 1, bedNumbers: undefined };
+  state.rooms = [legacyRoom];
+  Object.assign(state.residents[0], { room: legacyRoom, bedNumber: undefined, accountStatus: 'active', loginEnabled: true });
+  await seedToken(page, 'owner-token'); await page.goto('/residents');
+  await page.getByRole('button', { name: 'Edit Test Resident', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Edit Test Resident', exact: true });
+  await dialog.getByLabel('Full name', { exact: true }).fill('Unsaved Legacy Name');
+  await dialog.getByLabel('Email', { exact: true }).fill('unsaved@example.test');
+  await expect(dialog.getByLabel('Bed Number', { exact: true })).toBeDisabled();
+  await dialog.getByRole('button', { name: 'Configure Beds', exact: true }).click();
+  const configure = page.getByRole('dialog', { name: 'Configure beds for room 301', exact: true });
+  await configure.getByRole('button', { name: 'Use B1, B2, B3 labels', exact: true }).click();
+  await configure.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(configure).toHaveCount(0);
+  expect(state.roomWrites).toEqual([{ capacity: 1, bedNumbers: ['B1'] }]);
+  expect(state.writes).toHaveLength(0); expect(state.residents[0].bedNumber).toBeUndefined();
+  await expect(dialog.getByLabel('Full name', { exact: true })).toHaveValue('Unsaved Legacy Name');
+  await expect(dialog.getByLabel('Email', { exact: true })).toHaveValue('unsaved@example.test');
+  const beds = dialog.getByLabel('Bed Number', { exact: true });
+  await expect(beds).toBeEnabled(); await beds.selectOption('B1');
+  await dialog.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect.poll(() => state.writes.length).toBe(1);
+  expect(state.writes[0]).toMatchObject({ fullName: 'Unsaved Legacy Name', email: 'unsaved@example.test', room: room._id, bedNumber: 'B1', monthlyRent: 5000 });
+  expect(state.writes[0]).not.toHaveProperty('temporaryPassword');
+});
+
+test('bed editing: changing rooms refreshes bed choices and Rooms can edit configured slots', async ({ page }) => {
+  const state = await mockAPI(page);
+  const other = { ...room, _id: '555555555555555555555555', roomNumber: '202', capacity: 1, currentResidents: 0, bedNumbers: ['B1'] };
+  state.rooms = [{ ...room }, other];
+  await seedToken(page, 'owner-token'); await page.goto('/residents');
+  await page.getByRole('button', { name: 'Add resident', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  const rooms = dialog.getByLabel('Room Number', { exact: true }), beds = dialog.getByLabel('Bed Number', { exact: true });
+  await rooms.selectOption(room._id); await beds.selectOption('1B');
+  await rooms.selectOption(other._id);
+  await expect(beds).toHaveValue(''); await expect(beds.locator('option[value="1B"]')).toHaveCount(0);
+  await expect(beds.locator('option[value="B1"]')).toBeEnabled();
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.goto('/rooms');
+  await page.getByRole('button', { name: 'Edit room 202', exact: true }).click();
+  const roomDialog = page.getByRole('dialog', { name: 'Edit room 202', exact: true });
+  await roomDialog.getByLabel('Capacity (beds)', { exact: true }).fill('2');
+  await roomDialog.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(roomDialog.getByText('Enter exactly 2 bed number(s) to match room capacity.', { exact: true })).toBeVisible();
+  expect(state.roomWrites).toHaveLength(0);
+  await roomDialog.getByLabel('Bed numbers', { exact: true }).fill('B1, B2');
+  await roomDialog.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect.poll(() => state.roomWrites.length).toBe(1);
+  expect(state.roomWrites[0]).toMatchObject({ capacity: 2, bedNumbers: ['B1', 'B2'] });
 });
 
 test('resident portal displays API rent and attendance, refreshes profile and supports mobile navigation', async ({ page }) => {
