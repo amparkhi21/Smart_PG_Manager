@@ -6,7 +6,7 @@ export function resolveBedNumber(room, value, { required = false } = {}) {
   const bedNumbers = room.bedNumbers || [];
   const requested = typeof value === 'string' ? value.trim() : '';
   if (!bedNumbers.length) {
-    if (requested) throw new ApiError(400, 'This room has no configured beds');
+    if (requested || required) throw new ApiError(400, 'Configure bed numbers for this room before assigning a resident');
     return undefined;
   }
   if (!requested) {

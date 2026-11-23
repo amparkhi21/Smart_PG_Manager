@@ -135,7 +135,8 @@ test('Phase 2B room requests, approval races and preserved history on isolated M
   });
   await t.test('stale or inactive residents cannot be moved; rejection is final and scoped', async () => {
     const room = await emptyRoom(), alternative = await emptyRoom(), actor = await person(), submitted = await ask(actor, room);
-    assert.equal((await request('PUT', `/residents/${actor.resident._id}`, { room: String(alternative._id) })).status, 200);
+    assert.equal((await request('PUT', `/rooms/${alternative._id}`, { bedNumbers: ['B1'] })).status, 200);
+    assert.equal((await request('PUT', `/residents/${actor.resident._id}`, { room: String(alternative._id), bedNumber: 'B1' })).status, 200);
     assert.equal((await decide(submitted.data.id)).status, 409);
     assert.equal((await decide(submitted.data.id, 'Rejected')).status, 400);
     assert.equal((await decide(submitted.data.id, 'Rejected', 'Your room was already reassigned')).status, 200);
