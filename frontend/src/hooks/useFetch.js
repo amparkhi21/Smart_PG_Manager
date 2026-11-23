@@ -29,5 +29,5 @@ export default function useFetch(fetcher, deps = []) {
     return () => { latest.current += 1; };
   }, [load]);
 
-  return { data, loading, error, reload: load };
+  return { data, loading, error, reload: load, setData };
 }
