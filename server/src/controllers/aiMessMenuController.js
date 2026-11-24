@@ -16,16 +16,27 @@ export const generateMessPlan = asyncHandler(async (req, res) => {
       .select('date meals -_id').sort({ date: 1 }).limit(14).lean();
     // Only dates and bounded food names cross the provider boundary. No PG IDs,
     // owner/resident details, serving notes, credentials or arbitrary documents.
-    const relevantMeals = input.mode === 'weekly' ? MEAL_KEYS : [input.meal];
+    const relevantMeals = input.meal === 'all' ? MEAL_KEYS : [input.meal];
     const history = menus.map((menu) => ({ date: menu.date, meals: Object.fromEntries(relevantMeals.map((key) => [key, (menu.meals?.[key]?.items || []).slice(0, 8).map((item) => item.slice(0, 120))])) }));
     const result = await (req.app.locals.messAIPlanner || menuPlanner).generate(input, history, controller.signal);
     res.json({ success: true, data: { ...result, mode: input.mode, date: input.date } });
   } catch (error) {
     // These errors contain only our fixed messages; production's generic 5xx
     // handler would otherwise hide the actionable missing-key/quota guidance.
-    if (error instanceof ApiError) res.status(error.statusCode).json({ success: false, message: error.message,
-      ...(error.code && { code: error.code }), ...(error.providerStatus && { providerStatus: error.providerStatus }),
-    });
+    if (error instanceof ApiError) {
+      const timing = error.timing && {
+        elapsedMs: error.timing.elapsedMs, attempts: error.timing.attempts,
+        attemptTimeoutMs: error.timing.attemptTimeoutMs, totalTimeoutMs: error.timing.totalTimeoutMs,
+        ...(error.timing.lastProviderStatus && { lastProviderStatus: error.timing.lastProviderStatus }),
+        ...(error.timing.timeoutSource && { timeoutSource: error.timing.timeoutSource }),
+      };
+      if (error.code) console.warn('AI menu generation failed', { code: error.code, status: error.statusCode,
+        ...(error.providerStatus && { providerStatus: error.providerStatus }), ...(timing && { timing }) });
+      if (!res.destroyed) res.status(error.statusCode).json({ success: false, message: error.message,
+        ...(error.code && { code: error.code }), ...(error.providerStatus && { providerStatus: error.providerStatus }),
+        ...(timing && { timing }),
+      });
+    }
     else throw error;
   } finally { generating.delete(owner); res.removeListener('close', closed); }
 });

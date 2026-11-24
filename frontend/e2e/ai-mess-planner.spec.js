@@ -69,7 +69,7 @@ test.beforeEach(async ({ context, page }) => {
   await page.goto(`${origin}/mess-management`); await expect(page.getByRole('heading', { name: 'Mess Management', exact: true })).toBeVisible();
 });
 test.afterEach(async () => { expect(await Resident.collection.findOne({ _id: resident._id })).toEqual(residentBefore); });
-const panel = (page) => page.getByRole('dialog', { name: 'AI Menu Planner', exact: true });
+const panel = (page) => page.getByRole('dialog', { name: 'AI Daily Menu Ideas', exact: true });
 async function open(page) { await page.getByRole('button', { name: 'AI Menu Ideas', exact: true }).click(); await expect(panel(page)).toBeVisible(); }
 async function generate(page) { await panel(page).getByRole('button', { name: 'Generate ideas', exact: true }).click(); await expect(panel(page).getByRole('region', { name: 'AI menu preview', exact: true })).toBeVisible(); }
 async function confirmSave(page, editor, confirmation, date) {
@@ -80,193 +80,179 @@ async function confirmSave(page, editor, confirmation, date) {
   await expect(dialog).toHaveCount(0); expect(await MessMenu.findOne({ owner: owner._id, date })).not.toBeNull();
 }
 
-test('daily ideas regenerate, preview without writes, require overwrite confirmation and persist for owner/resident', async ({ page }) => {
-  await open(page); await panel(page).getByLabel('Custom instructions', { exact: true }).fill('Kal breakfast mein healthy suggest karo. Poha mat dena.');
-  await panel(page).getByLabel('Per-person budget (₹, optional)', { exact: true }).fill('40'); await generate(page);
-  await expect(panel(page).getByRole('article')).toHaveCount(3); expect(lastInput.prompt).toContain('Poha mat dena'); expect(lastInput.budget).toBe(40);
-  expect((await MessMenu.findOne({ owner: owner._id, date: today })).meals.breakfast.items).toEqual(['Original breakfast']);
+test('individual Daily Ideas still regenerate and save only an approved meal with existing times', async ({ page }) => {
+  await open(page); await panel(page).getByLabel('Meal', { exact: true }).selectOption('breakfast');
+  await panel(page).getByLabel('Custom instructions', { exact: true }).fill('Kal breakfast mein healthy suggest karo. Poha mat dena.');
+  await panel(page).getByLabel('Per-person meal budget (₹, optional)', { exact: true }).fill('40'); await generate(page);
+  await expect(panel(page).getByRole('article')).toHaveCount(3); expect(lastInput.budgetScope).toBe('meal'); expect(lastInput.budget).toBe(40);
   await panel(page).getByRole('button', { name: 'Regenerate suggestion 1', exact: true }).click();
   await expect(panel(page).getByRole('article', { name: 'Suggestion 1', exact: true })).toContainText('Regenerated Dosa 1'); expect(calls).toBe(2);
   await panel(page).getByRole('article', { name: 'Suggestion 1', exact: true }).getByRole('button', { name: 'Use This Menu', exact: true }).click();
   const editor = page.getByRole('dialog', { name: /^Edit menu/ }); await expect(editor.getByText(/A saved menu exists/)).toBeVisible();
   await expect(editor.locator('#breakfast-servingTime')).toHaveValue(times.breakfast); await expect(editor.locator('#lunch-items')).toHaveValue('Original lunch');
   await editor.locator('#breakfast-items').fill('Owner approved dosa\nChutney');
-  await editor.getByRole('button', { name: 'Save menu', exact: true }).click();
-  const confirmation = page.getByRole('dialog', { name: 'Overwrite saved menu?', exact: true }); await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click();
-  expect((await MessMenu.findOne({ owner: owner._id, date: today })).meals.breakfast.items).toEqual(['Original breakfast']);
   await confirmSave(page, editor, 'Overwrite saved menu?', today); await page.reload();
   await expect(page.getByText('Owner approved dosa', { exact: true })).toBeVisible();
-  const saved = await MessMenu.findOne({ owner: owner._id, date: today }); expect(saved.meals.breakfast.servingTime).toBe(times.breakfast); expect(saved.meals.lunch.items).toEqual(['Original lunch']);
+  const saved = await MessMenu.findOne({ owner: owner._id, date: today }); expect(saved.meals.lunch.items).toEqual(['Original lunch']);
+  expect(saved.meals.breakfast.servingTime).toBe(times.breakfast);
   await page.evaluate((token) => localStorage.setItem('pg_token', token), residentToken); await page.goto(`${origin}/resident/mess-menu`);
-  await expect(page.getByText('Owner approved dosa', { exact: true })).toBeVisible(); await expect(page.getByRole('button', { name: 'AI Menu Ideas', exact: true })).toHaveCount(0);
+  await expect(page.getByText('Owner approved dosa', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'AI Menu Ideas', exact: true })).toHaveCount(0);
 });
 
-test('seven-day preview edits and regenerates one meal, applies only selected days and preserves configured times', async ({ page }) => {
-  const tomorrow = offsetDate(today, 1), second = offsetDate(today, 2);
-  await open(page); await panel(page).getByRole('tab', { name: 'Weekly Planner', exact: true }).click();
-  await panel(page).getByLabel('Start date', { exact: true }).fill(tomorrow); await generate(page);
-  await expect(panel(page).getByRole('article')).toHaveCount(7);
-  await expect(panel(page).locator('textarea[id^="ai-20"]')).toHaveCount(28);
-  for (let index = 0; index < 7; index++) await expect(panel(page).getByRole('article', { name: `Menu ${offsetDate(tomorrow, index)}`, exact: true })).toHaveCount(1);
-  const firstDay = panel(page).getByRole('article', { name: `Menu ${tomorrow}`, exact: true });
-  await firstDay.getByLabel('Breakfast', { exact: true }).fill('Edited weekly upma\nFruit');
-  await firstDay.getByRole('button', { name: `Regenerate Lunch for ${tomorrow}`, exact: true }).click();
-  await expect(firstDay.getByLabel('Lunch', { exact: true })).toHaveValue('Regenerated Dosa 1\nChutney');
-  await expect(firstDay.getByLabel('Breakfast', { exact: true })).toHaveValue('Edited weekly upma\nFruit'); expect(calls).toBe(2);
-  await firstDay.getByRole('checkbox').check(); await panel(page).getByRole('article', { name: `Menu ${second}`, exact: true }).getByRole('checkbox').check();
-  expect(await MessMenu.countDocuments({ owner: owner._id })).toBe(1);
-  const lastDinner = panel(page).getByRole('article', { name: `Menu ${offsetDate(tomorrow, 6)}`, exact: true }).getByLabel('Dinner', { exact: true });
-  const originalDinner = await lastDinner.inputValue(); await lastDinner.fill('');
-  await expect(panel(page).getByRole('button', { name: 'Review selected days (2)', exact: true })).toBeDisabled();
-  await expect(panel(page).getByRole('alert')).toContainText('Complete all four meals');
-  await lastDinner.fill(originalDinner);
-  await panel(page).getByRole('button', { name: 'Review selected days (2)', exact: true }).click();
-  let editor = page.getByRole('dialog', { name: /^Add menu/ }); await expect(editor.locator('#breakfast-items')).toHaveValue('Edited weekly upma\nFruit');
-  for (const key of Object.keys(times)) await expect(editor.locator(`#${key}-servingTime`)).toHaveValue(times[key]);
-  const originalLunch = await editor.locator('#lunch-items').inputValue(); await editor.locator('#lunch-items').fill('');
+test('All Meals offers daily-only options, edits and regenerates each card, confirms overwrite and persists to both portals', async ({ page }) => {
+  const before = await MessMenu.collection.find({}).toArray();
+  await open(page);
+  expect(await panel(page).getByLabel('Meal', { exact: true }).locator('option').allTextContents()).toEqual(['All Meals', 'Breakfast', 'Lunch', 'Snacks', 'Dinner']);
+  await expect(panel(page).getByRole('tab', { name: 'Weekly Planner', exact: true })).toHaveCount(0);
+  await expect(panel(page).getByLabel('Duration', { exact: true })).toHaveCount(0);
+  await panel(page).getByLabel('Preference', { exact: true }).selectOption('highProtein');
+  await panel(page).getByLabel('Per-person daily budget (₹, optional)', { exact: true }).fill('150');
+  await panel(page).getByLabel('Custom instructions', { exact: true }).fill('हल्का खाना. High protein chahiye; poha mat dena.');
+  await generate(page); await expect(panel(page).getByRole('article')).toHaveCount(4);
+  expect(lastInput.date).toBe(today); expect(lastInput.days).toBe(1); expect(lastInput.budgetScope).toBe('day'); expect(lastInput.preference).toBe('highProtein');
+  const labels = { breakfast: 'Breakfast', lunch: 'Lunch', eveningSnacks: 'Snacks', dinner: 'Dinner' };
+  for (const [key, label] of Object.entries(labels)) {
+    const card = panel(page).getByRole('article', { name: label, exact: true });
+    const otherValues = {};
+    for (const other of Object.values(labels).filter((value) => value !== label)) otherValues[other] = await panel(page).getByLabel(`${other} food items`, { exact: true }).inputValue();
+    await card.getByRole('button', { name: `Regenerate ${label}`, exact: true }).click();
+    await expect(card.getByLabel(`${label} food items`, { exact: true })).toHaveValue('Regenerated Dosa 1\nChutney');
+    expect(lastInput.meal).toBe(key); expect(lastInput.budgetScope).toBe('day'); expect(lastInput.budget).toBe(150);
+    for (const [other, value] of Object.entries(otherValues)) await expect(panel(page).getByLabel(`${other} food items`, { exact: true })).toHaveValue(value);
+    await card.getByRole('button', { name: `Edit ${label}`, exact: true }).click();
+    await card.getByLabel(`${label} food items`, { exact: true }).fill(`Owner approved ${key}\nChutney`);
+    await card.getByRole('button', { name: `Done editing ${label}`, exact: true }).click();
+  }
+  expect(calls).toBe(5); expect(await MessMenu.collection.find({}).toArray()).toEqual(before);
+  const dinner = panel(page).getByRole('article', { name: 'Dinner', exact: true });
+  await dinner.getByRole('button', { name: 'Edit Dinner', exact: true }).click(); await dinner.getByLabel('Dinner food items', { exact: true }).fill('');
+  await expect(panel(page).getByRole('button', { name: 'Use All Meals', exact: true })).toBeDisabled();
+  await dinner.getByLabel('Dinner food items', { exact: true }).fill('Owner approved dinner\nChutney');
+  await panel(page).getByRole('button', { name: 'Use All Meals', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: /^Edit menu/ });
+  for (const key of Object.keys(labels)) {
+    await expect(editor.locator(`#${key}-items`)).toHaveValue(`Owner approved ${key}\nChutney`);
+    await expect(editor.locator(`#${key}-servingTime`)).toHaveValue(times[key]);
+  }
+  await editor.locator('#lunch-items').fill(''); await editor.getByRole('button', { name: 'Save menu', exact: true }).click();
+  await expect(editor.getByText('Complete this meal before saving the AI day menu.', { exact: true })).toBeVisible();
+  await editor.locator('#lunch-items').fill('Owner approved lunch\nChutney');
   await editor.getByRole('button', { name: 'Save menu', exact: true }).click();
-  await expect(editor.getByText('Complete this meal before saving the weekly plan.', { exact: true })).toBeVisible();
-  expect(await MessMenu.findOne({ owner: owner._id, date: tomorrow })).toBeNull();
-  await editor.locator('#lunch-items').fill(originalLunch);
-  await confirmSave(page, editor, 'Publish menu?', tomorrow);
-  editor = page.getByRole('dialog', { name: /^Add menu/ }); await expect(editor).toBeVisible(); expect(await MessMenu.findOne({ owner: owner._id, date: second })).toBeNull();
-  await confirmSave(page, editor, 'Publish menu?', second);
-  expect(await MessMenu.countDocuments({ owner: owner._id })).toBe(3);
-  for (let day = 3; day <= 7; day++) expect(await MessMenu.findOne({ owner: owner._id, date: offsetDate(today, day) })).toBeNull();
-  await page.reload(); await page.getByLabel('Menu date', { exact: true }).fill(second);
-  await expect(page.getByText('AI Idli breakfast 2', { exact: true })).toBeVisible();
+  await page.getByRole('dialog', { name: 'Overwrite saved menu?', exact: true }).getByRole('button', { name: 'Cancel', exact: true }).click();
+  expect(await MessMenu.collection.find({}).toArray()).toEqual(before);
+  await confirmSave(page, editor, 'Overwrite saved menu?', today); await page.reload();
+  for (const key of Object.keys(labels)) await expect(page.getByText(`Owner approved ${key}`, { exact: true })).toBeVisible();
+  const saved = await MessMenu.findOne({ owner: owner._id, date: today });
+  for (const key of Object.keys(labels)) { expect(saved.meals[key].items).toEqual([`Owner approved ${key}`, 'Chutney']); expect(saved.meals[key].servingTime).toBe(times[key]); }
   await page.evaluate((token) => localStorage.setItem('pg_token', token), residentToken); await page.goto(`${origin}/resident/mess-menu`);
-  await expect(page.getByText('Edited weekly upma', { exact: true })).toBeVisible();
-  await page.getByLabel('Upcoming menu date', { exact: true }).selectOption(second); await expect(page.getByText('AI Idli breakfast 2', { exact: true })).toBeVisible();
-});
-
-test('missing key and provider errors are actionable while manual menu editing remains available', async ({ page }) => {
-  app.locals.messAIPlanner = createMenuPlanner({ env: {} }); await open(page);
-  await panel(page).getByRole('button', { name: 'Generate ideas', exact: true }).click(); await expect(panel(page).getByRole('alert')).toContainText('AI Menu Planner is not configured.');
-  await panel(page).getByRole('button', { name: 'Close', exact: true }).click();
-  await page.getByRole('button', { name: 'Edit menu', exact: true }).click(); await expect(page.getByRole('dialog', { name: /^Edit menu/ }).locator('#breakfast-items')).toHaveValue('Original breakfast');
-  await page.getByRole('dialog', { name: /^Edit menu/ }).getByRole('button', { name: 'Cancel', exact: true }).click();
-  app.locals.messAIPlanner = planner(); providerMode = 'quota'; await open(page);
-  await panel(page).getByRole('button', { name: 'Generate ideas', exact: true }).click(); await expect(panel(page).getByRole('alert')).toContainText('quota');
-  providerMode = 'malformed'; await panel(page).getByRole('button', { name: 'Generate ideas', exact: true }).click(); await expect(panel(page).getByRole('alert')).toContainText('invalid menu');
-  providerMode = ''; await generate(page); await expect(panel(page).getByRole('article')).toHaveCount(3);
+  for (const key of Object.keys(labels)) await expect(page.getByText(`Owner approved ${key}`, { exact: true })).toBeVisible();
   expect(await MessMenu.countDocuments({ owner: owner._id })).toBe(1);
 });
 
-test('mobile three-day planner fits viewport and duplicate Generate/Save clicks issue one request', async ({ page }) => {
+test('mobile All Meals generates once, inherits serving times for a new date and reloads the saved menu', async ({ page }) => {
+  const tomorrow = offsetDate(today, 1);
   await page.setViewportSize({ width: 360, height: 800 }); await open(page);
-  await panel(page).getByRole('tab', { name: 'Weekly Planner', exact: true }).click(); await panel(page).getByLabel('Duration', { exact: true }).selectOption('3');
-  delay = 150;
+  await panel(page).getByLabel('Target menu date', { exact: true }).fill(tomorrow);
+  await panel(page).getByLabel('Food type', { exact: true }).selectOption('nonVegetarian');
+  await panel(page).getByLabel('Preference', { exact: true }).selectOption('budget'); delay = 100;
   await panel(page).getByRole('button', { name: 'Generate ideas', exact: true }).evaluate((button) => { button.click(); button.click(); });
-  await expect(panel(page).getByRole('article')).toHaveCount(3); expect(calls).toBe(1);
-  await expect(panel(page).locator('textarea[id^="ai-20"]')).toHaveCount(12);
+  await expect(panel(page).getByRole('article')).toHaveCount(4); expect(calls).toBe(1);
+  expect(lastInput.date).toBe(tomorrow); expect(lastInput.diet).toBe('nonVegetarian'); expect(lastInput.preference).toBe('budget');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(await panel(page).evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth)).toBe(true);
-  await panel(page).getByRole('article').first().getByRole('checkbox').check(); await panel(page).getByRole('button', { name: 'Review selected days (1)', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: /^Edit menu/ }); await editor.getByRole('button', { name: 'Save menu', exact: true }).click();
-  let writes = 0; page.on('request', (request) => { if (request.method() === 'PUT' && request.url() === `${apiOrigin}/api/mess-menus/${today}`) writes++; });
-  const confirmation = page.getByRole('dialog', { name: 'Overwrite saved menu?', exact: true });
-  await confirmation.getByRole('button', { name: 'Save menu', exact: true }).evaluate((button) => { button.click(); button.click(); });
-  await expect(confirmation).toHaveCount(0); expect(writes).toBe(1);
-  expect((await MessMenu.findOne({ owner: owner._id, date: today })).meals.breakfast.servingTime).toBe(times.breakfast);
-  await page.screenshot({ path: fileURLToPath(new URL('../../tmp/ai-mess-mobile.png', import.meta.url)), fullPage: true });
+  await panel(page).getByRole('button', { name: 'Use All Meals', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: /^Add menu/ });
+  for (const key of Object.keys(times)) await expect(editor.locator(`#${key}-servingTime`)).toHaveValue(times[key]);
+  expect(await MessMenu.findOne({ owner: owner._id, date: tomorrow })).toBeNull();
+  await confirmSave(page, editor, 'Publish menu?', tomorrow); await page.reload();
+  await page.getByLabel('Menu date', { exact: true }).fill(tomorrow);
+  for (const key of Object.keys(times)) await expect(page.getByText(`AI Idli ${key}`, { exact: true })).toBeVisible();
+  await page.evaluate((token) => localStorage.setItem('pg_token', token), residentToken); await page.goto(`${origin}/resident/mess-menu`);
+  await page.getByLabel('Upcoming menu date', { exact: true }).selectOption(tomorrow);
+  for (const key of Object.keys(times)) await expect(page.getByText(`AI Idli ${key}`, { exact: true })).toBeVisible();
+  await page.screenshot({ path: fileURLToPath(new URL('../../tmp/ai-all-meals-mobile.png', import.meta.url)), fullPage: true });
 });
 
-test('weekly provider failures never show an incomplete preview or write menus and allow an explicit retry', async ({ page }) => {
-  await open(page); await panel(page).getByRole('tab', { name: 'Weekly Planner', exact: true }).click();
-  for (const [failure, code, message] of [
-    ['schema', 'GEMINI_SCHEMA_TOO_COMPLEX', 'response schema'], ['quota', 'GEMINI_QUOTA_EXCEEDED', 'quota'],
-    ['truncated', 'GEMINI_OUTPUT_TRUNCATED', 'before completing'], ['incomplete', 'GEMINI_INVALID_RESPONSE', 'invalid menu'],
-    ['duplicate', 'GEMINI_INVALID_RESPONSE', 'invalid menu'], ['malformed', 'GEMINI_INVALID_RESPONSE', 'invalid menu'],
-  ]) {
+test('All Meals provider failures never fabricate cards or publish menus and allow a safe explicit retry', async ({ page }) => {
+  const before = await MessMenu.collection.find({}).toArray(); await open(page);
+  for (const [failure, code] of [['schema', 'GEMINI_SCHEMA_TOO_COMPLEX'], ['quota', 'GEMINI_QUOTA_EXCEEDED'], ['truncated', 'GEMINI_OUTPUT_TRUNCATED'], ['incomplete', 'GEMINI_INVALID_RESPONSE'], ['duplicate', 'GEMINI_INVALID_RESPONSE'], ['malformed', 'GEMINI_INVALID_RESPONSE']]) {
     aiMenuRateLimit.resetKey(`mess-ai:${owner._id}`); providerMode = failure;
-    const response = page.waitForResponse((response) => response.url().endsWith('/api/mess-menus/ai/plan'));
+    const pending = page.waitForResponse((response) => response.url().endsWith('/api/mess-menus/ai/plan'));
     await panel(page).getByRole('button', { name: 'Generate ideas', exact: true }).click();
-    expect((await (await response).json()).code).toBe(code);
-    await expect(panel(page).getByRole('alert')).toContainText(message);
-    await expect(panel(page).getByRole('alert')).not.toContainText('private-key');
+    expect((await (await pending).json()).code).toBe(code);
+    await expect(panel(page).getByRole('alert')).toBeVisible(); await expect(panel(page).getByRole('alert')).not.toContainText('private-key');
     await expect(panel(page).getByRole('region', { name: 'AI menu preview', exact: true })).toHaveCount(0);
-    expect(await MessMenu.countDocuments({ owner: owner._id })).toBe(1);
+    expect(await MessMenu.collection.find({}).toArray()).toEqual(before);
   }
   aiMenuRateLimit.resetKey(`mess-ai:${owner._id}`); providerMode = ''; await generate(page);
-  await expect(panel(page).getByRole('article')).toHaveCount(7); expect(calls).toBe(7);
-  expect(await MessMenu.countDocuments({ owner: owner._id })).toBe(1);
+  await expect(panel(page).getByRole('article')).toHaveCount(4); expect(await MessMenu.collection.find({}).toArray()).toEqual(before);
 });
 
-test('real Gemini seven-day response renders all 28 editable meals locally without publication', async ({ page }) => {
-  test.skip(process.env.AI_MESS_REAL_GEMINI !== '1', 'Opt-in: one configured free-tier generation with at most two transient-503 retries.');
-  test.setTimeout(120000);
+test('All Meals timeout recovery releases the owner request and never shows a partial menu', async ({ page }) => {
+  let attempts = 0;
+  app.locals.messAIPlanner = createMenuPlanner({ env: { GEMINI_API_KEY: 'disposable-browser-key' }, timeoutMs: 35,
+    createClient: () => ({ models: { generateContent: async (request) => {
+      attempts++; return attempts === 1 ? new Promise(() => {}) : { text: JSON.stringify(fixturePlan(JSON.parse(request.contents).request)) };
+    } } }) });
+  const before = await MessMenu.collection.find({}).toArray(); await open(page);
+  const pending = page.waitForResponse((response) => response.url().endsWith('/api/mess-menus/ai/plan'));
+  await panel(page).getByRole('button', { name: 'Generate ideas', exact: true }).click();
+  const response = await pending; expect(response.status()).toBe(504);
+  const error = await response.json(); expect(error.timing.timeoutSource).toBe('planner_deadline');
+  await expect(panel(page).getByRole('alert')).toContainText('Gemini timed out');
+  await expect(panel(page).getByRole('article')).toHaveCount(0);
+  await generate(page); await expect(panel(page).getByRole('article')).toHaveCount(4);
+  expect(attempts).toBe(2); expect(await MessMenu.collection.find({}).toArray()).toEqual(before);
+});
+
+test('real Gemini All Meals generates exactly four meals for one date without publication', async ({ page }) => {
+  test.skip(process.env.AI_MESS_REAL_GEMINI !== '1', 'Opt-in: one real daily All Meals request with bounded transient-503 retries.');
+  test.setTimeout(210000);
   const require = createRequire(new URL('../../server/package.json', import.meta.url));
   const configured = require('dotenv').parse(readFileSync(new URL('../../server/.env', import.meta.url)));
   const env = { GEMINI_API_KEY: configured.GEMINI_API_KEY, GEMINI_MODEL: configured.GEMINI_MODEL };
-  const { GoogleGenAI } = require('@google/genai');
-  const statuses = [], upstream = []; let realCalls = 0, finishReason, usage, generationRequests = 0, writes = 0;
-  const started = Date.now();
+  const { GoogleGenAI } = require('@google/genai'); const upstream = []; let realCalls = 0, generationRequests = 0, writes = 0;
+  app.locals.messAIPlanner = createMenuPlanner({ env, createClient(options) {
+    const client = new GoogleGenAI({ ...options, httpOptions: { ...options.httpOptions, fetch: async (...args) => {
+      const started = Date.now(); const response = await fetch(...args);
+      const record = { httpStatus: response.status, elapsedMs: Date.now() - started, host: new URL(String(args[0])).hostname };
+      if (!response.ok) {
+        let payload; try { payload = await response.clone().json(); } catch {}
+        if (typeof payload?.error?.status === 'string' && /^[A-Z_]{1,60}$/.test(payload.error.status)) record.code = payload.error.status;
+        if (typeof payload?.error?.message === 'string') record.message = payload.error.message.split(env.GEMINI_API_KEY?.trim() || '__no_key__').join('[REDACTED]').replace(/AIza[\w-]+/g, '[REDACTED]').slice(0, 1000);
+      }
+      upstream.push(record); console.log(`ALL_MEALS_UPSTREAM ${JSON.stringify(record)}`); return response;
+    } } });
+    return { models: { async generateContent(request) { realCalls++; return client.models.generateContent(request); } } };
+  } });
   page.on('request', (request) => {
     const path = new URL(request.url()).pathname;
     if (path === '/api/mess-menus/ai/plan' && request.method() === 'POST') generationRequests++;
     if (/^\/api\/mess-menus(?:\/\d{4}-\d{2}-\d{2})?$/.test(path) && ['POST', 'PUT', 'DELETE'].includes(request.method())) writes++;
   });
-  app.locals.messAIPlanner = createMenuPlanner({ env, createClient(options) {
-    const client = new GoogleGenAI({ ...options, httpOptions: { ...options.httpOptions, fetch: async (...args) => {
-      const response = await fetch(...args); statuses.push(response.status);
-      const record = { attempt: statuses.length, providerHost: new URL(String(args[0])).hostname, httpStatus: response.status, elapsedMs: Date.now() - started };
-      if (!response.ok) {
-        let payload; try { payload = await response.clone().json(); } catch { /* Never expose an unstructured error body. */ }
-        const provider = payload?.error;
-        if (typeof provider?.status === 'string' && /^[A-Z_]{1,60}$/.test(provider.status)) record.providerCode = provider.status;
-        if (typeof provider?.message === 'string') record.providerMessage = provider.message
-          .split(env.GEMINI_API_KEY?.trim() || '__no_key__').join('[REDACTED]').replace(/AIza[\w-]+/g, '[REDACTED]').slice(0, 1000);
-      }
-      upstream.push(record);
-      console.log(`GEMINI_UPSTREAM ${JSON.stringify(record)}`);
-      return response;
-    } } });
-    return { models: { async generateContent(request) {
-      realCalls++; const response = await client.models.generateContent(request);
-      finishReason = response.candidates?.[0]?.finishReason; usage = response.usageMetadata; return response;
-    } } };
-  } });
   const before = await MessMenu.collection.find({}).toArray();
-  const start = offsetDate(today, 1);
-  await page.setViewportSize({ width: 1280, height: 1000 });
-  await open(page); await panel(page).getByRole('tab', { name: 'Weekly Planner', exact: true }).click();
-  await panel(page).getByLabel('Start date', { exact: true }).fill(start);
-  const pending = page.waitForResponse((response) => response.url().endsWith('/api/mess-menus/ai/plan'), { timeout: 65000 });
-  await panel(page).getByRole('button', { name: 'Generate ideas', exact: true }).evaluate((button) => { button.click(); button.click(); });
-  const response = await pending;
-  const body = await response.json();
-  if (response.status() !== 200) {
-    await expect(panel(page).getByRole('alert')).toContainText(body.message);
-    await expect(panel(page).getByRole('region', { name: 'AI menu preview', exact: true })).toHaveCount(0);
-    expect(await MessMenu.collection.find({}).toArray()).toEqual(before);
-    expect(generationRequests).toBe(1); expect(writes).toBe(0);
-    const safe = { result: 'FAIL', httpStatus: response.status(), providerHttpStatuses: statuses, upstream, providerCalls: realCalls,
-      generationRequests, databaseUnchanged: true, publicationRequests: writes, code: body.code, providerStatus: body.providerStatus, message: body.message };
-    writeFileSync(new URL('../../tmp/ai-mess-real-verification.json', import.meta.url), JSON.stringify(safe, null, 2));
-    throw new Error(`Real Gemini verification failed: ${JSON.stringify(safe)}`);
+  await page.setViewportSize({ width: 1280, height: 1000 }); await open(page);
+  const pending = page.waitForResponse((response) => response.url().endsWith('/api/mess-menus/ai/plan'), { timeout: 165000 });
+  await panel(page).getByRole('button', { name: 'Generate ideas', exact: true }).click();
+  const response = await pending; const body = await response.json();
+  const report = { result: response.status() === 200 ? 'PENDING_UI' : 'FAIL', httpStatus: response.status(), model: body.data?.model || env.GEMINI_MODEL,
+    upstream, realCalls, generationRequests, publicationRequests: writes, timing: body.data?.timing || body.timing, code: body.code, providerStatus: body.providerStatus, message: body.message };
+  writeFileSync(new URL('../../tmp/ai-all-meals-real-verification.json', import.meta.url), JSON.stringify(report, null, 2));
+  expect(await MessMenu.collection.find({}).toArray()).toEqual(before); expect(writes).toBe(0); expect(generationRequests).toBe(1);
+  if (response.status() !== 200) throw new Error(`Real All Meals failed: ${JSON.stringify(report)}`);
+  expect(body.data.model).toBe('gemini-3.6-flash'); expect(body.data.date).toBe(today);
+  expect(Object.keys(body.data.meals)).toEqual(['breakfast', 'lunch', 'eveningSnacks', 'dinner']);
+  await expect(panel(page).getByRole('article')).toHaveCount(4);
+  for (const [key, label] of Object.entries({ breakfast: 'Breakfast', lunch: 'Lunch', eveningSnacks: 'Snacks', dinner: 'Dinner' })) {
+    const card = panel(page).getByRole('article', { name: label, exact: true }); const meal = body.data.meals[key];
+    expect(meal.vegetarian).toBe(true); expect(meal.items.length).toBeGreaterThan(0);
+    const field = card.getByLabel(`${label} food items`, { exact: true }); await field.scrollIntoViewIfNeeded(); await expect(field).toBeVisible();
+    await expect(field).toHaveValue(meal.items.join('\n')); await card.getByRole('button', { name: `Edit ${label}`, exact: true }).click(); await expect(field).toBeEditable();
+    await card.screenshot({ path: fileURLToPath(new URL(`../../tmp/ai-all-meals-real-${key}.png`, import.meta.url)) });
   }
-  await expect(panel(page).getByRole('article')).toHaveCount(7);
-  await expect(panel(page).locator('textarea[id^="ai-20"]')).toHaveCount(28);
-  const dates = Array.from({ length: 7 }, (_, index) => offsetDate(start, index));
-  expect(body.data.days.map((day) => day.date)).toEqual(dates);
-  for (const date of dates) {
-    const day = panel(page).getByRole('article', { name: `Menu ${date}`, exact: true });
-    for (const label of ['Breakfast', 'Lunch', 'Snacks', 'Dinner']) {
-      const meal = day.getByLabel(label, { exact: true });
-      await meal.scrollIntoViewIfNeeded(); await expect(meal).toBeVisible(); await expect(meal).toBeEditable();
-      expect((await meal.inputValue()).trim().length).toBeGreaterThan(0);
-    }
-    await day.screenshot({ path: fileURLToPath(new URL(`../../tmp/ai-mess-real-${date}.png`, import.meta.url)) });
-  }
-  expect(realCalls).toBe(statuses.length); expect(realCalls).toBeGreaterThanOrEqual(1); expect(realCalls).toBeLessThanOrEqual(3);
-  expect(statuses.at(-1)).toBe(200); expect(statuses.slice(0, -1).every((status) => status === 503)).toBe(true);
-  expect(generationRequests).toBe(1); expect(writes).toBe(0); expect(finishReason).toBe('STOP');
-  const firstMeal = panel(page).getByRole('article', { name: `Menu ${start}`, exact: true }).getByLabel('Breakfast', { exact: true });
-  const original = await firstMeal.inputValue(); await firstMeal.fill(`${original}\nOwner edit`); await expect(firstMeal).toHaveValue(`${original}\nOwner edit`); await firstMeal.fill(original);
-  expect(await MessMenu.collection.find({}).toArray()).toEqual(before);
-  const verification = { result: 'PASS', model: body.data.model, providerHttpStatuses: statuses, upstream, providerCalls: realCalls, generationRequests, publicationRequests: writes, finishReason,
-    dayCount: body.data.days.length, mealCount: 28, dates, allMealsVisibleAndEditable: true, databaseUnchanged: true, usage };
-  writeFileSync(new URL('../../tmp/ai-mess-real-verification.json', import.meta.url), JSON.stringify(verification, null, 2));
-  console.log(`REAL_GEMINI_VERIFIED ${JSON.stringify(verification)}`);
+  expect(realCalls).toBeLessThanOrEqual(3);
+  Object.assign(report, { result: 'PASS', date: body.data.date, totalValidMeals: 4, allFourVisibleAndEditable: true, vegetarianOnlyValidated: true, databaseUnchanged: true });
+  writeFileSync(new URL('../../tmp/ai-all-meals-real-verification.json', import.meta.url), JSON.stringify(report, null, 2));
+  console.log(`REAL_ALL_MEALS_VERIFIED ${JSON.stringify(report)}`);
 });

@@ -23,7 +23,7 @@ export default function MessMenuEditor({ date, menu, suggestedMeals, onClose, on
     event.preventDefault(); setError('');
     const result = prepareMenu(draft);
     if (suggestedMeals && MEALS.every(({ key }) => Object.hasOwn(suggestedMeals, key))) {
-      for (const { key } of MEALS) if (!result.meals[key].items.length) result.errors[`${key}.items`] = 'Complete this meal before saving the weekly plan.';
+      for (const { key } of MEALS) if (!result.meals[key].items.length) result.errors[`${key}.items`] = 'Complete this meal before saving the AI day menu.';
     }
     setErrors(result.errors);
     if (Object.keys(result.errors).length) return setError('Check the highlighted meal details before saving.');

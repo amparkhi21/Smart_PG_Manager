@@ -11,11 +11,14 @@ import Room from '../src/models/Room.js';
 import Resident from '../src/models/Resident.js';
 import MessMenu from '../src/models/MessMenu.js';
 import { aiMenuRateLimit } from '../src/routes/messMenuRoutes.js';
-import { createMenuPlanner, plannerInput, plannerSchema, validatePlannerOutput, offsetDate } from '../src/utils/aiMessPlanner.js';
+import { createMenuPlanner, plannerInput, plannerSchema, validatePlannerOutput, offsetDate, GEMINI_ATTEMPT_TIMEOUT_MS, GEMINI_PLAN_TIMEOUT_MS } from '../src/utils/aiMessPlanner.js';
 import { todayIST } from '../src/utils/dates.js';
 import generateToken, { generateResidentToken } from '../src/utils/generateToken.js';
 import { fixturePlan, fixtureMeal } from './helpers/aiMessFixtures.js';
 import { generateMessPlan } from '../src/controllers/aiMessMenuController.js';
+import { setImmediate as flush } from 'node:timers/promises';
+
+const realTimeout = setTimeout;
 
 const input = (extra = {}) => plannerInput({ mode: 'daily', date: todayIST(), meal: 'breakfast', diet: 'vegetarian', preference: 'healthy', prompt: 'Poha mat dena', ...extra });
 const fakeService = (generate, extra = {}) => createMenuPlanner({ env: { GEMINI_API_KEY: 'disposable-sdk-test-key', GEMINI_MODEL: 'gemini-3.6-flash' },
@@ -31,9 +34,10 @@ test('installed official Google SDK sends JSON schema, fixed model and bounded g
   assert.equal(wire.body.generationConfig.responseMimeType, 'application/json');
   assert.ok(wire.body.generationConfig.responseJsonSchema); assert.equal(wire.body.generationConfig.maxOutputTokens, 2400);
 });
-test('schema validates daily ideas, exact 3/7-day coverage and vegetarian restrictions', () => {
-  for (const days of [3, 7]) { const config = input({ mode: 'weekly', days }); const plan = fixturePlan(config); assert.equal(validatePlannerOutput(JSON.stringify(plan), config).days.length, days);
-    plan.meals[4].date = plan.meals[0].date; assert.throws(() => validatePlannerOutput(JSON.stringify(plan), config)); }
+test('schema validates individual daily ideas, All Meals coverage and vegetarian restrictions', () => {
+  const all = input({ meal: 'all' }); const plan = fixturePlan(all);
+  assert.equal(Object.keys(validatePlannerOutput(JSON.stringify(plan), all).meals).length, 4);
+  plan.meals[1].date = offsetDate(all.date, 1); assert.throws(() => validatePlannerOutput(JSON.stringify(plan), all));
   const config = input(), raw = fixturePlan(config);
   assert.equal(validatePlannerOutput(JSON.stringify(raw), config).suggestions.length, 3);
   for (const items of [['Chicken curry'], ['Egg bhurji'], ['मछली फ्राई'], ['Mutton biryani']]) { raw.suggestions[0].items = items; assert.throws(() => validatePlannerOutput(JSON.stringify(raw), config), /Vegetarian Only/); }
@@ -42,28 +46,27 @@ test('schema validates daily ideas, exact 3/7-day coverage and vegetarian restri
   for (const value of ['not-json', '{}', 'x'.repeat(64001), JSON.stringify({ suggestions: [], warnings: [] })]) assert.throws(() => validatePlannerOutput(value, config));
   for (const change of [{ date: '2026-13-01' }, { days: 8, mode: 'weekly' }, { prompt: 'x'.repeat(1501) }, { budget: -1 }, { budget: Infinity }, { diet: 'unknown' }, { avoid: ['x'.repeat(121)] }]) assert.throws(() => input(change), { statusCode: 400 });
 });
-test('compact weekly schema generates 12/28 meals in one call and retains all preferences and history', async () => {
-  for (const days of [3, 7]) for (const diet of ['vegetarian', 'nonVegetarian']) for (const preference of ['healthy', 'budget', 'highProtein']) {
-    const config = input({ mode: 'weekly', days, diet, preference, budget: 150, prompt: 'हल्का खाना; avoid poha, high protein chahiye' });
+test('All Meals generates four meals for one date in one call and retains preferences, daily budget and history', async () => {
+  for (const diet of ['vegetarian', 'nonVegetarian']) for (const preference of ['healthy', 'budget', 'highProtein']) {
+    const config = input({ meal: 'all', diet, preference, budget: 150, prompt: 'हल्का खाना; avoid poha, high protein chahiye' });
     const history = [{ date: offsetDate(config.date, -1), meals: { breakfast: ['Recent Idli'], lunch: ['Dal'], eveningSnacks: ['Fruit'], dinner: ['Roti'] } }];
     let calls = 0, captured;
     const service = fakeService(async (request) => { calls++; captured = request; return { text: JSON.stringify(fixturePlan(config)), candidates: [{ finishReason: 'STOP' }] }; });
     const result = await service.generate(config, history);
-    assert.equal(calls, 1); assert.equal(result.days.length, days);
-    assert.equal(result.days.flatMap((day) => Object.keys(day.meals)).length, days * 4);
-    assert.deepEqual(result.days.map((day) => day.date), Array.from({ length: days }, (_, index) => offsetDate(config.date, index)));
+    assert.equal(calls, 1); assert.equal(Object.keys(result.meals).length, 4);
+    assert.equal(result.date, config.date); assert.equal(config.days, 1); assert.equal(config.budgetScope, 'day');
     assert.deepEqual(JSON.parse(captured.contents), { request: config, recentMenus: history });
-    assert.match(captured.config.systemInstruction, /concise food names/);
+    assert.match(captured.config.systemInstruction, /concise food names/); assert.match(captured.config.systemInstruction, /total for ALL FOUR meals/);
     assert.ok(JSON.stringify(plannerSchema(config)).length < 700);
     assert.doesNotMatch(JSON.stringify(captured.config.responseJsonSchema), /minItems|maxItems|minLength|maxLength|explanation|ingredientNotes/);
   }
 });
 
-test('weekly validator rejects missing, duplicate, wrong-date, wrong-meal and malformed rows without filling meals', () => {
-  const config = input({ mode: 'weekly', days: 7 });
+test('All Meals validator rejects missing, duplicate, wrong-date, wrong-meal and malformed rows without filling meals', () => {
+  const config = input({ meal: 'all' });
   const valid = fixturePlan(config);
   const reversed = validatePlannerOutput(JSON.stringify({ ...valid, meals: [...valid.meals].reverse() }), config);
-  assert.equal(reversed.days.length, 7); assert.equal(reversed.days[0].date, config.date);
+  assert.equal(Object.keys(reversed.meals).length, 4); assert.equal(reversed.date, config.date);
   for (const corrupt of [
     (plan) => plan.meals.pop(),
     (plan) => plan.meals.push({ ...plan.meals[0] }),
@@ -84,8 +87,19 @@ test('weekly validator rejects missing, duplicate, wrong-date, wrong-meal and ma
     const malformed = fixturePlan(config); malformed.meals[0].items = [item];
     assert.throws(() => validatePlannerOutput(JSON.stringify(malformed), config), { code: 'GEMINI_DIET_MISMATCH' });
     malformed.meals[0].vegetarian = false;
-    assert.equal(validatePlannerOutput(JSON.stringify(malformed), { ...config, diet: 'nonVegetarian' }).days[0].meals.breakfast.vegetarian, false);
+    assert.equal(validatePlannerOutput(JSON.stringify(malformed), { ...config, diet: 'nonVegetarian' }).meals.breakfast.vegetarian, false);
   }
+});
+
+test('All Meals rejects multi-day requests and keeps daily budget scope during individual regeneration', async () => {
+  for (const change of [{ mode: 'weekly', days: 3 }, { mode: 'weekly', days: 7 }, { meal: 'all', days: 7 },
+    { mode: 'meal', meal: 'all' }, { meal: 'all', budgetScope: 'meal' }, { budgetScope: 'unknown' }]) assert.throws(() => input(change), { statusCode: 400 });
+  const config = input({ mode: 'meal', meal: 'lunch', budget: 150, budgetScope: 'day' });
+  let captured;
+  const result = await fakeService(async (request) => { captured = request; return { text: JSON.stringify(fixturePlan(config)) }; }).generate(config, []);
+  assert.equal(result.suggestions.length, 1);
+  assert.equal(JSON.parse(captured.contents).request.budgetScope, 'day'); assert.match(captured.config.systemInstruction, /reasonable share/);
+  assert.equal(input({ budget: 40 }).budgetScope, 'meal');
 });
 
 test('provider failures, missing credentials, timeouts and malformed responses return safe actionable errors', async () => {
@@ -108,13 +122,13 @@ test('provider failures, missing credentials, timeouts and malformed responses r
   await assert.rejects(fakeService(() => new Promise(() => {}), { timeoutMs: 15 }).generate(input(), []), { statusCode: 504, code: 'GEMINI_TIMEOUT' });
   await assert.rejects(fakeService(async () => ({ text: 'broken' })).generate(input(), []), { statusCode: 502, code: 'GEMINI_INVALID_RESPONSE' });
   const schemaError = Object.assign(new Error(JSON.stringify({ error: { code: 400, status: 'INVALID_ARGUMENT', message: 'The specified schema produces a constraint that has too many states for serving. private-key-must-not-leak' } })), { status: 400 });
-  await assert.rejects(fakeService(async () => { throw schemaError; }).generate(input({ mode: 'weekly', days: 7 }), []),
+  await assert.rejects(fakeService(async () => { throw schemaError; }).generate(input({ meal: 'all' }), []),
     (error) => error.code === 'GEMINI_SCHEMA_TOO_COMPLEX' && error.providerStatus === 400 && !error.message.includes('private-key'));
-  await assert.rejects(fakeService(async () => ({ text: '{"meals":[', candidates: [{ finishReason: 'MAX_TOKENS' }] })).generate(input({ mode: 'weekly', days: 7 }), []),
+  await assert.rejects(fakeService(async () => ({ text: '{"meals":[', candidates: [{ finishReason: 'MAX_TOKENS' }] })).generate(input({ meal: 'all' }), []),
     { statusCode: 502, code: 'GEMINI_OUTPUT_TRUNCATED' });
 });
 test('transient 503 retries use exponential backoff, identical requests and no overlapping SDK calls', { timeout: 15000 }, async () => {
-  const config = input({ mode: 'weekly', days: 7 });
+  const config = input({ meal: 'all' });
   const calls = []; let active = 0, maxActive = 0;
   const planner = createMenuPlanner({ env: { GEMINI_API_KEY: 'disposable-sdk-test-key' }, createClient: (options) => new GoogleGenAI({ ...options, httpOptions: { ...options.httpOptions,
     fetch: async (url, init) => {
@@ -126,7 +140,7 @@ test('transient 503 retries use exponential backoff, identical requests and no o
     },
   } }) });
   const result = await planner.generate(config, []);
-  assert.equal(result.days.length, 7); assert.equal(calls.length, 3); assert.equal(maxActive, 1);
+  assert.equal(Object.keys(result.meals).length, 4); assert.equal(calls.length, 3); assert.equal(maxActive, 1);
   assert.equal(calls[0].body, calls[1].body); assert.equal(calls[1].body, calls[2].body);
   assert.ok(calls[1].time - calls[0].time >= 1900); assert.ok(calls[2].time - calls[1].time >= 3900);
 });
@@ -134,7 +148,7 @@ test('transient 503 retries use exponential backoff, identical requests and no o
 test('transient 503 retries stop after three upstream failures with a sanitized provider error', { timeout: 15000 }, async () => {
   let calls = 0;
   const planner = fakeService(async () => { calls++; throw Object.assign(new Error('private-key-must-not-leak'), { status: 503 }); });
-  await assert.rejects(planner.generate(input({ mode: 'weekly', days: 7 }), []),
+  await assert.rejects(planner.generate(input({ meal: 'all' }), []),
     (error) => error.code === 'GEMINI_UNAVAILABLE' && error.providerStatus === 503 && !error.message.includes('private-key'));
   assert.equal(calls, 3);
 });
@@ -166,6 +180,86 @@ test('transient 503 retries stop during backoff when cancelled or when the total
     await new Promise((resolve) => setTimeout(resolve, 40));
     assert.equal(calls, 1);
   }
+});
+
+test('timeout recovery: a retry can finish after 45 seconds without increasing the SDK attempt timeout', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const config = input({ meal: 'all' });
+  let calls = 0, sdkTimeout;
+  const service = createMenuPlanner({ env: { GEMINI_API_KEY: 'disposable-timeout-key' }, createClient(options) {
+    sdkTimeout = options.httpOptions.timeout;
+    return { models: { generateContent() {
+      const attempt = ++calls;
+      return new Promise((resolve, reject) => setTimeout(() => attempt === 1
+        ? reject(Object.assign(new Error('temporary unavailability'), { status: 503 }))
+        : resolve({ text: JSON.stringify(fixturePlan(config)) }), attempt === 1 ? 30000 : 20000));
+    } } };
+  } });
+  const operation = service.generate(config, []);
+  t.mock.timers.tick(30000); await flush();
+  t.mock.timers.tick(2000); await new Promise((resolve) => realTimeout(resolve, 2100)); await flush();
+  t.mock.timers.tick(20000); await flush();
+  const result = await operation;
+  assert.equal(calls, 2); assert.equal(Object.keys(result.meals).length, 4); assert.equal(result.timing.attempts, 2);
+  assert.equal(sdkTimeout, 45000); assert.equal(GEMINI_ATTEMPT_TIMEOUT_MS, 45000);
+  assert.equal(GEMINI_PLAN_TIMEOUT_MS, 3 * 45000 + 2000 + 4000);
+  assert.equal(result.timing.totalTimeoutMs, 141000);
+});
+
+test('timeout recovery: planner, SDK, network and upstream timeouts have distinct safe diagnostics', async () => {
+  const cases = [
+    [() => new Promise(() => {}), { timeoutMs: 15 }, 'planner_deadline', undefined],
+    [async () => { throw Object.assign(new Error('private-key-must-not-leak'), { name: 'AbortError' }); }, {}, 'sdk_timeout', undefined],
+    [async () => { throw new TypeError('private-key-must-not-leak', { cause: { code: 'UND_ERR_CONNECT_TIMEOUT' } }); }, {}, 'network_timeout', undefined],
+    [async () => { throw Object.assign(new Error('private-key-must-not-leak'), { status: 504 }); }, {}, 'upstream_gemini', 504],
+  ];
+  for (const [generate, options, source, providerStatus] of cases) {
+    await assert.rejects(fakeService(generate, options).generate(input(), []), (error) => {
+      assert.equal(error.statusCode, 504); assert.equal(error.code, 'GEMINI_TIMEOUT');
+      assert.equal(error.timing.timeoutSource, source); assert.equal(error.providerStatus, providerStatus);
+      assert.equal(error.timing.attempts, 1); assert.ok(error.timing.elapsedMs >= 0);
+      assert.doesNotMatch(JSON.stringify(error), /private-key-must-not-leak|disposable-sdk-test-key/); return true;
+    });
+  }
+});
+
+test('timeout recovery: overall deadline cancels backoff and retains the last real provider status', async () => {
+  let calls = 0;
+  await assert.rejects(fakeService(async () => { calls++; throw Object.assign(new Error('temporary unavailability'), { status: 503 }); }, { timeoutMs: 20 }).generate(input(), []),
+    (error) => error.code === 'GEMINI_TIMEOUT' && error.timing.timeoutSource === 'planner_deadline'
+      && error.timing.lastProviderStatus === 503 && error.providerStatus === undefined);
+  assert.equal(calls, 1);
+});
+
+test('timeout recovery: pre-aborted callers consume no Gemini request and caller cancellation is not a timeout', async () => {
+  const alreadyAborted = new AbortController(); alreadyAborted.abort(); let calls = 0;
+  await assert.rejects(fakeService(async () => { calls++; }).generate(input(), [], alreadyAborted.signal),
+    (error) => error.code === 'GEMINI_CANCELLED' && error.timing.timeoutSource === 'client_cancelled');
+  assert.equal(calls, 0);
+  const controller = new AbortController();
+  const service = fakeService(async () => { calls++; setTimeout(() => controller.abort(), 10);
+    throw Object.assign(new Error('temporary unavailability'), { status: 503 }); });
+  await assert.rejects(service.generate(input(), [], controller.signal),
+    (error) => error.code === 'GEMINI_CANCELLED' && error.timing.timeoutSource === 'client_cancelled');
+  assert.equal(calls, 1);
+});
+
+test('timeout recovery: controller releases the owner lock after timeout and never publishes a partial plan', async (t) => {
+  const query = { select() { return this; }, sort() { return this; }, limit() { return this; }, async lean() { return []; } };
+  t.mock.method(MessMenu, 'find', () => query);
+  const writes = t.mock.method(MessMenu, 'create', () => { throw new Error('Generation must never save menus'); });
+  const warnings = t.mock.method(console, 'warn', () => {});
+  let calls = 0;
+  const config = input({ meal: 'all' });
+  const service = fakeService(async () => { calls++; return calls === 1 ? new Promise(() => {}) : { text: JSON.stringify(fixturePlan(config)) }; }, { timeoutMs: 20 });
+  const req = { body: config, owner: { _id: new mongoose.Types.ObjectId() }, app: { locals: { messAIPlanner: service } } };
+  const response = () => ({ writableEnded: false, once() {}, removeListener() {}, status(status) { this.statusCode = status; return this; }, json(body) { this.body = body; this.writableEnded = true; return this; } });
+  const failed = response(); await generateMessPlan(req, failed, (error) => { throw error; });
+  assert.equal(failed.statusCode, 504); assert.equal(failed.body.timing.timeoutSource, 'planner_deadline');
+  assert.equal(failed.body.data, undefined);
+  const recovered = response(); await generateMessPlan(req, recovered, (error) => { throw error; });
+  assert.equal(Object.keys(recovered.body.data.meals).length, 4); assert.equal(calls, 2); assert.equal(writes.mock.callCount(), 0);
+  assert.equal(warnings.mock.callCount(), 1); assert.doesNotMatch(JSON.stringify(warnings.mock.calls[0].arguments), /private-key|disposable-sdk-test-key/);
 });
 
 test('controller exposes only sanitized provider error codes and actual provider status', async (t) => {
@@ -221,11 +315,14 @@ test('owner AI workflow isolates PG context, limits requests and saves only expl
     assert.deepEqual(Object.keys(context.recentMenus[0].meals), ['breakfast']);
     assert.doesNotMatch(captured.contents, /FOREIGN_DISH|TOO_OLD|PRIVATE_|9800000001|pgId|owner/);
     assert.match(captured.config.systemInstruction, /Hindi, English or Hinglish/); assert.equal(context.request.prompt, 'Poha mat dena');
+    const all = await plan(input({ meal: 'all', budget: 150 })); assert.equal(all.status, 200);
+    assert.deepEqual(Object.keys(JSON.parse(captured.contents).recentMenus[0].meals), ['breakfast', 'lunch', 'eveningSnacks', 'dinner']);
+    assert.doesNotMatch(captured.contents, /FOREIGN_DISH|TOO_OLD|PRIVATE_|9800000001|pgId|owner/);
     const other = await plan(input(), foreignToken); assert.equal(other.status, 200); assert.match(captured.contents, /FOREIGN_DISH/); assert.doesNotMatch(captured.contents, /Recent Idli/);
     assert.deepEqual(await MessMenu.collection.find({}).toArray(), original);
   });
-  await t.test('daily, three-day and seven-day plans do not save anything; exact repeats warn', async () => {
-    reset(); for (const config of [input(), input({ mode: 'weekly', days: 3 }), input({ mode: 'weekly', days: 7 })]) { const result = await plan(config); assert.equal(result.status, 200); assert.equal(result.data.days?.length || result.data.suggestions.length, config.mode === 'weekly' ? config.days : 3); }
+  await t.test('daily All Meals and individual suggestions do not save anything; exact repeats warn', async () => {
+    reset(); for (const config of [input(), input({ meal: 'all' }), input({ mode: 'meal', meal: 'dinner' })]) { const result = await plan(config); assert.equal(result.status, 200); assert.equal(result.data.meals ? Object.keys(result.data.meals).length : result.data.suggestions.length, config.meal === 'all' ? 4 : config.mode === 'meal' ? 1 : 3); }
     const repeated = fixturePlan(input()); repeated.suggestions[0] = fixtureMeal('Recent Idli');
     assert.match(validatePlannerOutput(JSON.stringify(repeated), input(), [{ meals: { breakfast: ['Recent Idli'] } }]).warnings.join(' '), /repeat/);
     assert.deepEqual(await MessMenu.collection.find({}).toArray(), original);
