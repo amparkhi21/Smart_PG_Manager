@@ -30,6 +30,16 @@ test('empty menus and clearing food items are supported without inventing servin
   assert.deepEqual(prepareMenu(draft).meals.dinner.items, []);
 });
 
+test('AI drafts replace only selected meals, preserve existing times and use configured times for new dates', () => {
+  const menu = { meals: { breakfast: { items: ['Old'], servingTime: '08:15', notes: 'Old note' }, lunch: { items: ['Dal'], servingTime: '13:00', notes: '' } } };
+  const suggested = { breakfast: { items: ['Dosa'], notes: 'Reviewed AI idea', servingTime: '09:00' } };
+  const draft = menuDraft(menu, suggested);
+  assert.equal(draft.breakfast.items, 'Dosa'); assert.equal(draft.breakfast.servingTime, '08:15');
+  assert.equal(draft.lunch.items, 'Dal'); assert.equal(draft.lunch.servingTime, '13:00');
+  assert.equal(menuDraft(null, suggested).breakfast.servingTime, '09:00');
+  assert.deepEqual(menu.meals.breakfast.items, ['Old']);
+});
+
 test('meal validation enforces serving times, food limits and optional note limits', () => {
   const draft = menuDraft(null);
   draft.breakfast.items = 'Poha';

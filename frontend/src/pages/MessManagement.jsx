@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Pencil, Plus, RefreshCw, Trash2, Utensils } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Pencil, Plus, RefreshCw, Sparkles, Trash2, Utensils } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api/client.js';
 import useFetch from '../hooks/useFetch.js';
@@ -11,12 +11,15 @@ import Skeleton from '../components/ui/Skeleton.jsx';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import MenuCards from '../components/mess/MenuCards.jsx';
 import MessMenuEditor from '../components/mess/MessMenuEditor.jsx';
+import AIMenuPlanner from '../components/mess/AIMenuPlanner.jsx';
 import { formatDate, getErrorMessage, todayInput } from '../utils/format.js';
 import { hasMenuItems } from '../utils/messMenus.js';
 
 export default function MessManagement() {
   const [date, setDate] = useState(todayInput);
   const [editor, setEditor] = useState(null);
+  const [planner, setPlanner] = useState(false), [reviewQueue, setReviewQueue] = useState([]), [applying, setApplying] = useState(false);
+  const reviewLock = useRef(false);
   const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -25,6 +28,35 @@ export default function MessManagement() {
     catch (err) { if (err.response?.status === 404) return { date, menu: null }; throw err; }
   }, [date]);
   const current = data?.date === date ? data : null;
+  const reviewAI = async (days) => {
+    if (reviewLock.current) return;
+    reviewLock.current = true;
+    setApplying(true);
+    try {
+      const reviewed = await Promise.all(days.map(async (day) => {
+        let menu = null;
+        try { menu = (await api.get(`/mess-menus/${day.date}`)).data.data; }
+        catch (err) { if (err.response?.status !== 404) throw err; }
+        return { date: day.date, menu, suggestedMeals: day.meals };
+      }));
+      // Use recent configured times for new days. Existing-date times always win.
+      const firstDate = reviewed[0].date;
+      const from = new Date(Date.parse(`${firstDate}T12:00:00Z`) - 14 * 86400000).toISOString().slice(0, 10);
+      const recent = (await api.get('/mess-menus', { params: { from, to: firstDate } })).data.data;
+      for (const day of reviewed) if (!day.menu) {
+        day.menu = null;
+        day.suggestedMeals = Object.fromEntries(Object.entries(day.suggestedMeals).map(([key, meal]) => [key, { ...meal,
+          servingTime: [...recent].reverse().find((menu) => menu.meals?.[key]?.servingTime)?.meals[key].servingTime || '',
+        }]));
+      }
+      setPlanner(false); setDate(reviewed[0].date); setEditor(reviewed[0]); setReviewQueue(reviewed.slice(1));
+    } finally { reviewLock.current = false; setApplying(false); }
+  };
+  const saved = () => {
+    if (reviewQueue.length) { setDate(reviewQueue[0].date); setEditor(reviewQueue[0]); setReviewQueue((current) => current.slice(1)); }
+    else setEditor(null);
+    reload();
+  };
   const remove = async () => {
     if (saving) return;
     setSaving(true); setError('');
@@ -35,6 +67,7 @@ export default function MessManagement() {
   };
   return <div>
     <PageHeader title="Mess Management" subtitle="Plan daily meals for your PG and keep residents informed.">
+      <button type="button" className="btn-primary" onClick={() => setPlanner(true)} disabled={saving || Boolean(editor)}><Sparkles size={16} />AI Menu Ideas</button>
       <button type="button" className="btn-secondary" onClick={reload} disabled={loading || saving}><RefreshCw size={16} className={loading ? 'animate-spin' : ''} />Refresh menu</button>
     </PageHeader>
     <div className="card mb-5 flex flex-wrap items-end justify-between gap-4 p-4">
@@ -54,7 +87,8 @@ export default function MessManagement() {
         {!current.menu ? <div className="card"><EmptyState icon={Utensils} title="No menu planned yet" text="Add meals for this date. Once saved, residents in your PG can view them." /></div>
           : <>{!hasMenuItems(current.menu) && <p className="rounded-xl bg-orange-50 p-4 text-sm text-orange-800">This menu is saved with no food items. Edit it when your meals are ready.</p>}<MenuCards menu={current.menu} /></>}
       </section>}
-    {editor && <MessMenuEditor date={editor.date} menu={editor.menu} onClose={() => setEditor(null)} onSaved={() => { setEditor(null); reload(); }} />}
+    {planner && <AIMenuPlanner initialDate={date} onClose={() => setPlanner(false)} onApply={reviewAI} applying={applying} />}
+    {editor && <MessMenuEditor key={editor.date} date={editor.date} menu={editor.menu} suggestedMeals={editor.suggestedMeals} onClose={() => { setEditor(null); setReviewQueue([]); }} onSaved={saved} />}
     {deleting && <ConfirmDialog title="Delete this menu?" message={`Delete all four meals for ${formatDate(date)}? Residents will no longer see this menu.`} confirmText="Delete menu" loading={saving} onConfirm={remove} onCancel={() => setDeleting(false)} />}
   </div>;
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Loader2, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../api/client.js';
@@ -8,8 +8,9 @@ import { Field, Input, Textarea } from '../ui/FormControls.jsx';
 import { formatDate, getErrorMessage } from '../../utils/format.js';
 import { MEALS, menuDraft, prepareMenu } from '../../utils/messMenus.js';
 
-export default function MessMenuEditor({ date, menu, onClose, onSaved }) {
-  const [draft, setDraft] = useState(() => menuDraft(menu));
+export default function MessMenuEditor({ date, menu, suggestedMeals, onClose, onSaved }) {
+  const [draft, setDraft] = useState(() => menuDraft(menu, suggestedMeals));
+  const saveLock = useRef(false);
   const [errors, setErrors] = useState({});
   const [error, setError] = useState('');
   const [pending, setPending] = useState(null);
@@ -20,22 +21,28 @@ export default function MessMenuEditor({ date, menu, onClose, onSaved }) {
   };
   const submit = (event) => {
     event.preventDefault(); setError('');
-    const result = prepareMenu(draft); setErrors(result.errors);
+    const result = prepareMenu(draft);
+    if (suggestedMeals && MEALS.every(({ key }) => Object.hasOwn(suggestedMeals, key))) {
+      for (const { key } of MEALS) if (!result.meals[key].items.length) result.errors[`${key}.items`] = 'Complete this meal before saving the weekly plan.';
+    }
+    setErrors(result.errors);
     if (Object.keys(result.errors).length) return setError('Check the highlighted meal details before saving.');
     setPending(result.meals);
   };
   const save = async () => {
-    if (saving) return;
+    if (saveLock.current) return;
+    saveLock.current = true;
     setSaving(true); setError('');
     try {
       const result = menu ? await api.put(`/mess-menus/${date}`, { meals: pending }) : await api.post('/mess-menus', { date, meals: pending });
       toast.success(result.data.message || 'Mess menu saved'); onSaved();
-    } catch (err) { setPending(null); setError(getErrorMessage(err)); } finally { setSaving(false); }
+    } catch (err) { setPending(null); setError(getErrorMessage(err)); } finally { saveLock.current = false; setSaving(false); }
   };
   return <>
     <Modal title={`${menu ? 'Edit' : 'Add'} menu · ${formatDate(date)}`} onClose={onClose} size="lg" dismissable={!saving && !pending}>
       <form onSubmit={submit} noValidate className="space-y-5">
         <p className="text-sm text-slate-500">Serving times use Indian Standard Time (IST). Leave meals empty if they have not been planned.</p>
+        {suggestedMeals && <p role="status" className="rounded-xl bg-orange-50 p-3 text-sm text-orange-900">{menu ? 'A saved menu exists for this date. Saving will overwrite the meals you approve; existing serving times are retained unless you edit them.' : 'This is an AI draft. Review the meals and serving times before confirming Save.'}</p>}
         {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
         <div className="grid gap-4 sm:grid-cols-2">
           {MEALS.map(({ key, label }) => <fieldset key={key} disabled={saving || Boolean(pending)} className="min-w-0 space-y-4 rounded-2xl border border-slate-200 p-4">
@@ -57,6 +64,6 @@ export default function MessMenuEditor({ date, menu, onClose, onSaved }) {
         </div>
       </form>
     </Modal>
-    {pending && <ConfirmDialog title={menu ? 'Save menu changes?' : 'Publish menu?'} message={`Save the menu for ${formatDate(date)}? Residents in your PG will be able to view it.`} tone="primary" confirmText="Save menu" loading={saving} onConfirm={save} onCancel={() => setPending(null)} />}
+    {pending && <ConfirmDialog title={menu ? (suggestedMeals ? 'Overwrite saved menu?' : 'Save menu changes?') : 'Publish menu?'} message={`${menu && suggestedMeals ? 'Overwrite the existing saved menu' : 'Save the menu'} for ${formatDate(date)}? Residents in your PG will be able to view it.`} tone="primary" confirmText="Save menu" loading={saving} onConfirm={save} onCancel={() => setPending(null)} />}
   </>;
 }

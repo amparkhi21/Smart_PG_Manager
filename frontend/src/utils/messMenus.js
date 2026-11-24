@@ -7,11 +7,11 @@ export const MEALS = [
 
 const SERVING_TIME = /^(?:[01]\d|2[0-3]):[0-5]\d(?:-(?:[01]\d|2[0-3]):[0-5]\d)?$/;
 
-export function menuDraft(menu) {
+export function menuDraft(menu, suggestions) {
   return Object.fromEntries(MEALS.map(({ key }) => [key, {
-    items: (menu?.meals?.[key]?.items || []).join('\n'),
-    servingTime: menu?.meals?.[key]?.servingTime || '',
-    notes: menu?.meals?.[key]?.notes || '',
+    items: (suggestions?.[key]?.items || menu?.meals?.[key]?.items || []).join('\n'),
+    servingTime: menu?.meals?.[key]?.servingTime ?? suggestions?.[key]?.servingTime ?? '',
+    notes: suggestions?.[key]?.notes ?? menu?.meals?.[key]?.notes ?? '',
   }]));
 }
 

@@ -5,9 +5,17 @@ import validate from '../middleware/validate.js';
 import { isRealDate } from '../utils/dates.js';
 import { MEAL_KEYS, SERVING_TIME_RE } from '../models/MessMenu.js';
 import { createMessMenu, listMessMenus, getMessMenu, updateMessMenu, deleteMessMenu } from '../controllers/messMenuController.js';
+import rateLimit from 'express-rate-limit';
+import { generateMessPlan } from '../controllers/aiMessMenuController.js';
 
 const router = Router();
 router.use(protect);
+export const aiMenuRateLimit = rateLimit({
+  windowMs: 60000, max: 6, standardHeaders: true, legacyHeaders: false,
+  keyGenerator: (req) => `mess-ai:${req.owner._id}`,
+  message: { success: false, message: 'AI menu request limit reached. Wait a minute before generating again.' },
+});
+router.post('/ai/plan', aiMenuRateLimit, generateMessPlan);
 const validDate = (chain) => chain.isString().bail().custom(isRealDate).withMessage('Use a real date in YYYY-MM-DD format');
 const mealRules = (update = false) => [
   (update ? body('meals') : body('meals').optional()).isObject({ strict: true }).bail()
