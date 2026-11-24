@@ -118,7 +118,7 @@ export default function ResidentFormModal({ resident, onClose, onSaved }) {
     if (f.monthlyRent === '' || Number.isNaN(Number(f.monthlyRent)) || Number(f.monthlyRent) < 0) {
       e.monthlyRent = 'Enter the monthly rent (0 or more)';
     }
-    if (f.emergencyPhone.trim() && !PHONE_RE.test(cleanPhone(f.emergencyPhone))) {
+    if (f.emergencyPhone.trim() && (!editing || f.emergencyPhone !== (resident.emergencyContact?.phone || '')) && !PHONE_RE.test(cleanPhone(f.emergencyPhone))) {
       e.emergencyPhone = 'Enter a valid phone number';
     }
     setErrors(e);
@@ -135,15 +135,20 @@ export default function ResidentFormModal({ resident, onClose, onSaved }) {
     const payload = {
       ...(assignmentChanged && { room: f.room, bedNumber: selectedBed }),
       fullName: f.fullName.trim(),
-      phone: cleanPhone(f.phone),
-      joiningDate: f.joiningDate,
+      ...((!editing || cleanPhone(f.phone) !== cleanPhone(resident.phone)) && { phone: cleanPhone(f.phone) }),
+      ...((!editing || f.joiningDate !== toDateInput(resident.joiningDate)) && { joiningDate: f.joiningDate }),
       monthlyRent: Number(f.monthlyRent),
       ...((!editing || f.loginEnabled !== Boolean(resident.loginEnabled)) && { loginEnabled: f.loginEnabled }),
       ...(f.temporaryPassword && { temporaryPassword: f.temporaryPassword }),
     };
     if (editing) {
       payload.email = f.email.trim();
-      payload.emergencyContact = { name: emergencyName, phone: emergencyPhone };
+      if (emergencyName !== (resident.emergencyContact?.name || '') || f.emergencyPhone !== (resident.emergencyContact?.phone || '')) {
+        payload.emergencyContact = {
+          ...(emergencyName !== (resident.emergencyContact?.name || '') && { name: emergencyName }),
+          ...(f.emergencyPhone !== (resident.emergencyContact?.phone || '') && { phone: emergencyPhone }),
+        };
+      }
     } else {
       if (f.email.trim()) payload.email = f.email.trim();
       if (emergencyName || emergencyPhone) payload.emergencyContact = { name: emergencyName, phone: emergencyPhone };
@@ -255,13 +260,13 @@ export default function ResidentFormModal({ resident, onClose, onSaved }) {
         </div>
 
         <div>
-          <p className="mb-2 text-sm font-semibold text-slate-700">Emergency contact <span className="font-normal text-slate-400">(optional)</span></p>
+          <p className="mb-2 text-sm font-semibold text-slate-700">Parent / emergency contact <span className="font-normal text-slate-400">(optional)</span></p>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field htmlFor="emergencyName">
+            <Field htmlFor="emergencyName" label="Parent / contact name">
               <Input id="emergencyName" name="emergencyName" value={f.emergencyName} onChange={set} placeholder="Name" aria-label="Emergency contact name" />
             </Field>
-            <Field htmlFor="emergencyPhone" error={errors.emergencyPhone}>
-              <Input id="emergencyPhone" name="emergencyPhone" type="tel" inputMode="tel" value={f.emergencyPhone} onChange={set} invalid={!!errors.emergencyPhone} placeholder="Phone" aria-label="Emergency contact phone" />
+            <Field htmlFor="emergencyPhone" label="Parent's Phone Number" error={errors.emergencyPhone} hint="Optional emergency contact; include +country code outside India.">
+              <Input id="emergencyPhone" name="emergencyPhone" type="tel" inputMode="tel" value={f.emergencyPhone} onChange={set} invalid={!!errors.emergencyPhone} placeholder="Phone" />
             </Field>
           </div>
         </div>

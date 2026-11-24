@@ -106,9 +106,14 @@ export const updateResident = asyncHandler(async (req, res) => {
     await assertBedAvailable(req.owner._id, nextRoom, bedNumber, resident._id, session);
     setResidentBed(resident, previousRoom, nextRoom, bedNumber);
   }
-  ['fullName', 'phone', 'email', 'joiningDate', 'monthlyRent', 'emergencyContact'].forEach((k) => {
+  ['fullName', 'phone', 'email', 'joiningDate', 'monthlyRent'].forEach((k) => {
     if (req.body[k] !== undefined) resident[k] = req.body[k];
   });
+  if (req.body.emergencyContact !== undefined) {
+    for (const key of ['name', 'phone']) {
+      if (req.body.emergencyContact[key] !== undefined) resident.set(`emergencyContact.${key}`, req.body.emergencyContact[key]);
+    }
+  }
   await applyLoginAccess(resident, req.body);
   await resident.save({ session });
   return resident;

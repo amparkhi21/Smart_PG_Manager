@@ -26,8 +26,11 @@ const rules = (isUpdate) => {
     body('email').optional({ checkFalsy: true }).trim().isEmail().withMessage('Enter a valid email'),
     body('joiningDate').optional().isISO8601().withMessage('Invalid joining date'),
     body('monthlyRent').optional().isFloat({ min: 0 }).withMessage('Monthly rent must be 0 or more').toFloat(),
-    body('emergencyContact.name').optional({ checkFalsy: true }).trim().isLength({ max: 80 }),
-    body('emergencyContact.phone').optional({ checkFalsy: true }).trim().matches(/^\+?[0-9]{10,13}$/).withMessage('Invalid emergency contact phone'),
+    body('emergencyContact').optional().isObject({ strict: true }).withMessage('Invalid parent contact'),
+    body('emergencyContact.name').optional({ checkFalsy: true }).isString().bail().trim().isLength({ max: 80 }),
+    body('emergencyContact.phone').optional()
+      .customSanitizer((v) => typeof v === 'string' ? v.replace(/[\s().-]/g, '') : v)
+      .custom((v) => v === '' || Boolean(normalizePhone(v))).withMessage('Enter a valid parent phone number'),
   ];
 };
 

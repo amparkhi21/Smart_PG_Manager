@@ -6,6 +6,7 @@ export const todayIST = () => new Intl.DateTimeFormat('en-CA', { timeZone: TZ })
 
 // "2026-11"
 export const currentMonthIST = () => todayIST().slice(0, 7);
+export const dateInputIST = (date) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(date));
 
 // Due date (end of day, IST) for a "YYYY-MM" month and a due day number
 export const dueDateFor = (month, day = 5) =>

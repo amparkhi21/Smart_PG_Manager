@@ -49,7 +49,7 @@ export const protectResident = ({ allowPasswordChange = false } = {}) => asyncHa
     throw new ApiError(401, 'Your session has expired. Please log in again');
   }
   const [owner, room] = await Promise.all([
-    Owner.findById(resident.owner).select('pgName'),
+    Owner.findById(resident.owner).select('pgName phone'),
     Room.findOne({ _id: resident.room, owner: resident.owner }).select('roomNumber'),
   ]);
   if (!owner || !room) throw new ApiError(401, 'Your session has expired. Please log in again');

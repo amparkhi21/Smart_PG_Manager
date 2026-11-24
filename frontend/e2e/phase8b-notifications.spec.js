@@ -58,11 +58,14 @@ async function setup(page, extra = {}) {
 
 test('owner bell, read actions, All/Unread filters and older pages stay synchronized', async ({ page }) => {
   const state = await setup(page, { ownerView: true, rows: Array.from({ length: 23 }, (_, index) => notification(index + 1, true)) }); await page.goto('/notifications');
-  await expect(page.getByRole('link', { name: 'Notifications', exact: true })).toHaveAttribute('href', '/notifications');
+  await expect(page.getByRole('link', { name: 'Notifications', exact: true })).toHaveCount(0);
+  await page.getByRole('dialog', { name: 'Notifications', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByLabel('23 unread notifications', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Notifications', exact: true }).click();
   const panel = page.getByRole('dialog', { name: 'Notifications', exact: true }); await expect(panel.getByRole('article')).toHaveCount(5); await expect(panel.getByRole('article').first()).toHaveAccessibleName('Update 23');
   await page.keyboard.press('Escape'); await expect(panel).toHaveCount(0);
+  await page.getByRole('button', { name: 'Notifications', exact: true }).click();
+  await panel.getByRole('button', { name: 'View all notifications', exact: true }).click();
   const feed = page.getByRole('region', { name: 'Notification list', exact: true }); await expect(feed.getByRole('article')).toHaveCount(20);
   await feed.getByRole('button', { name: 'Unread', exact: true }).click();
   await feed.getByRole('button', { name: 'Mark Update 23 as read', exact: true }).evaluate((button) => { button.click(); button.click(); });
@@ -77,6 +80,7 @@ test('owner bell, read actions, All/Unread filters and older pages stay synchron
 
 test('resident mobile bell opens a real notice, validates its module link and supports navigation', async ({ page }) => {
   await setup(page, { rows: [notification(1)] }); await page.setViewportSize({ width: 360, height: 800 }); await page.goto('/resident/notifications');
+  await page.getByRole('dialog', { name: 'Notifications', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByLabel('1 unread notifications', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Notifications', exact: true }).click();
   await page.getByRole('dialog', { name: 'Notifications', exact: true }).getByRole('button', { name: 'Update 1', exact: true }).click();
@@ -84,10 +88,12 @@ test('resident mobile bell opens a real notice, validates its module link and su
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await detail.getByRole('button', { name: 'Open Notice Board', exact: true }).click(); await expect(page).toHaveURL(/\/resident\/notices$/);
   await expect(page.getByRole('article', { name: 'Water supply update', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Open navigation', exact: true }).click(); await expect(page.getByRole('link', { name: 'Notifications', exact: true })).toHaveAttribute('href', '/resident/notifications');
-  await page.getByRole('link', { name: 'Notifications', exact: true }).click(); await expect(page.getByRole('heading', { name: 'Notifications', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Notifications', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Emergency Contacts', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Close navigation', exact: true }).click();
   await page.getByRole('button', { name: 'Notifications', exact: true }).click(); await page.getByRole('button', { name: 'View all notifications', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'Notifications', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Notifications', exact: true }).getByRole('region', { name: 'Notification list', exact: true })).toBeVisible();
 });
 
 test('owner notification opens the existing private complaint details and response controls', async ({ page }) => {
@@ -115,8 +121,8 @@ test('foreign payloads remain hidden and unsafe notification links never navigat
   const feed = page.getByRole('region', { name: 'Notification list', exact: true });
   await expect(feed.getByText('Notifications could not be verified for this account. Please refresh.', { exact: true })).toBeVisible(); await expect(page.getByText('FOREIGN PRIVATE TITLE', { exact: true })).toHaveCount(0);
   state.bypassScope = false; await feed.getByRole('button', { name: 'Try again', exact: true }).click(); await feed.getByRole('button', { name: 'Update 1', exact: true }).click();
-  await expect(page.getByRole('dialog').getByText('This notification does not have an available application link.', { exact: true })).toBeVisible(); await expect(page).toHaveURL(/\/resident\/notifications$/);
-  expect(state.reads.every((read) => read.path.startsWith('/notifications'))).toBe(true);
+  await expect(page.getByRole('dialog').getByText('This notification does not have an available application link.', { exact: true })).toBeVisible(); await expect(page).toHaveURL(/\/resident\/dashboard$/);
+  expect(state.reads.every((read) => read.path.startsWith('/notifications') || read.path === '/resident/dashboard')).toBe(true);
 });
 
 test('load/write errors recover, missing records are friendly and session expiry clears private UI', async ({ page }) => {

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { sessionHome, ownerReturnPath } from './authRouting.js';
 import { backAction } from '../native/backNavigation.js';
 import { RESIDENT_NAV } from './residentNav.js';
+import { NAV, MOBILE_PRIMARY } from './nav.js';
 
 test('session landing depends on the authenticated role and first-login state', () => {
   assert.equal(sessionHome({ owner: { id: 'legacy-owner' } }), '/');
@@ -19,8 +20,14 @@ test('Android back handles resident roots, deep links and owner aliases', () => 
   assert.equal(backAction('/resident/profile', 2), 'back');
   assert.equal(backAction('/owner/register', 0), 'owner-login');
 });
-test('future resident modules have no interactive route until implemented', () => {
-  assert.equal(RESIDENT_NAV.length, 13);
-  assert.deepEqual(RESIDENT_NAV.filter((item) => item.to).map((item) => item.label), ['Dashboard', 'My Room', 'Room Availability', 'My Requests', 'Mess Menu', 'Community', 'My Bills & Payments', 'Notice Board', 'Emergency Contacts', 'Notifications', 'My Profile', 'Settings']);
-  assert.equal(RESIDENT_NAV.filter((item) => !item.to).length, 1);
+test('resident navigation includes personal attendance and omits retired menus', () => {
+  assert.deepEqual(RESIDENT_NAV.map((item) => item.label), ['Dashboard', 'My Room', 'Room Availability', 'My Requests', 'My Attendance', 'Mess Menu', 'Community', 'My Bills & Payments', 'Notice Board', 'My Profile', 'Settings']);
+  assert.equal(RESIDENT_NAV.find((item) => item.label === 'My Attendance').to, '/resident/attendance');
+  assert.equal(new Set(RESIDENT_NAV.map((item) => item.to)).size, RESIDENT_NAV.length);
+});
+test('owner desktop and mobile navigation keep all fifteen destinations in order without duplicates', () => {
+  assert.deepEqual(NAV.map(({ label }) => label), ['Dashboard', 'Rooms', 'Residents', 'Mess Management', 'Attendance', 'Community', 'Notice Board', 'Rent Management', 'Electricity Bills', 'Requests', 'Payment History', 'Resident Contacts', 'Reports', 'Reminders', 'Settings']);
+  assert.equal(new Set(NAV.map(({ to }) => to)).size, 15);
+  const mobile = [...NAV.filter(({ to }) => MOBILE_PRIMARY.includes(to)), ...NAV.filter(({ to }) => !MOBILE_PRIMARY.includes(to))];
+  assert.deepEqual(mobile, NAV);
 });

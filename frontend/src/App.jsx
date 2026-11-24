@@ -12,6 +12,7 @@ const Rooms = lazy(() => import('./pages/Rooms.jsx'));
 const Residents = lazy(() => import('./pages/Residents.jsx'));
 const ResidentProfile = lazy(() => import('./pages/ResidentProfile.jsx'));
 const Attendance = lazy(() => import('./pages/Attendance.jsx'));
+const ResidentAttendance = lazy(() => import('./pages/ResidentAttendance.jsx'));
 const Rent = lazy(() => import('./pages/Rent.jsx'));
 const Electricity = lazy(() => import('./pages/Electricity.jsx'));
 const PaymentHistory = lazy(() => import('./pages/PaymentHistory.jsx'));
@@ -28,7 +29,7 @@ const ResidentMessMenu = lazy(() => import('./pages/ResidentMessMenu.jsx'));
 const Community = lazy(() => import('./pages/Community.jsx'));
 const NoticeBoard = lazy(() => import('./pages/NoticeBoard.jsx'));
 const ResidentPayments = lazy(() => import('./pages/ResidentPayments.jsx'));
-const EmergencyContacts = lazy(() => import('./pages/EmergencyContacts.jsx'));
+const ResidentContacts = lazy(() => import('./pages/ResidentContacts.jsx'));
 const Notifications = lazy(() => import('./pages/Notifications.jsx'));
 const Requests = lazy(() => import('./pages/Requests.jsx'));
 
@@ -63,7 +64,7 @@ export default function App() {
             <Route path="payment-requests" element={<Navigate to="/requests" replace />} />
             <Route path="complaints" element={<Navigate to="/requests" replace />} />
             <Route path="leave-requests" element={<Navigate to="/requests" replace />} />
-            <Route path="emergency-contacts" element={<EmergencyContacts ownerView />} />
+            <Route path="emergency-contacts" element={<ResidentContacts />} />
             <Route path="notifications" element={<Notifications />} />
             <Route path="reports" element={<Reports />} />
             <Route path="reminders" element={<Reminders />} />
@@ -76,6 +77,7 @@ export default function App() {
           <Route element={<ResidentLayout />}>
             <Route path="/resident/dashboard" element={<ResidentDashboard />} />
             <Route path="/resident/profile" element={<ResidentAccount />} />
+            <Route path="/resident/attendance" element={<ResidentAttendance />} />
             <Route path="/resident/change-password" element={<ResidentChangePassword />} />
             <Route path="/resident/my-room" element={<ResidentMyRoom />} />
             <Route path="/resident/rooms" element={<ResidentRoomAvailability />} />
@@ -87,7 +89,7 @@ export default function App() {
             <Route path="/resident/payments" element={<ResidentPayments />} />
             <Route path="/resident/complaints" element={<Navigate to="/resident/requests" replace />} />
             <Route path="/resident/leave-requests" element={<Navigate to="/resident/requests" replace />} />
-            <Route path="/resident/emergency-contacts" element={<EmergencyContacts />} />
+            <Route path="/resident/emergency-contacts" element={<Navigate to="/resident/profile" replace />} />
             <Route path="/resident/notifications" element={<Notifications />} />
           </Route>
         </Route>

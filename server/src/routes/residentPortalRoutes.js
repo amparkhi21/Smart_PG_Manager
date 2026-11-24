@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { protectResident } from '../middleware/auth.js';
-import { getResidentDashboard, getResidentOwnProfile } from '../controllers/residentPortalController.js';
+import { getResidentDashboard, getResidentOwnProfile, getResidentAttendance } from '../controllers/residentPortalController.js';
 import { body, query } from 'express-validator';
 import validate from '../middleware/validate.js';
 import { getMyRoom, getRoomAvailability } from '../controllers/residentRoomController.js';
 import { createRoomChange, listRoomChanges, cancelRoomChangeRequest } from '../controllers/roomChangeController.js';
 import { getTodaysMessMenu, getUpcomingMessMenus } from '../controllers/messMenuController.js';
 import rateLimit from 'express-rate-limit';
-import { dateIn, idParam } from '../middleware/validators.js';
+import { dateIn, idParam, monthIn } from '../middleware/validators.js';
 import { CLAIM_STATUSES, BILL_TYPES } from '../models/PaymentClaim.js';
 import { listMyBills, listMyClaims, submitClaim, cancelMyClaim, getMyPaymentDetails, listMyPaymentHistory } from '../controllers/paymentClaimController.js';
 
@@ -15,6 +15,7 @@ const router = Router();
 router.use(protectResident());
 router.get('/dashboard', getResidentDashboard);
 router.get('/profile', getResidentOwnProfile);
+router.get('/attendance', monthIn(query, 'month', { optional: true }), validate, getResidentAttendance);
 router.get('/mess-menus/today', getTodaysMessMenu);
 router.get('/mess-menus/upcoming', getUpcomingMessMenus);
 router.get('/room-change-requests', query('status').optional().isString().bail().isIn(['Pending', 'Approved', 'Rejected']), validate, listRoomChanges);

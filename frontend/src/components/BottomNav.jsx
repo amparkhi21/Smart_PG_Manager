@@ -15,11 +15,12 @@ export default function BottomNav() {
     <>
       <nav aria-label="Main navigation" className="mobile-bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white lg:hidden">
         <ul className="mx-auto grid max-w-lg grid-cols-5">
-          {primary.map(({ to, short, icon: Icon, end }) => (
+          {primary.map(({ to, short, label, icon: Icon, end }) => (
             <li key={to}>
               <NavLink
                 to={to}
                 end={end}
+                aria-label={label}
                 className={({ isActive }) =>
                   `flex min-h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold ${
                     isActive ? 'text-navy-900' : 'text-slate-400'
@@ -54,7 +55,7 @@ export default function BottomNav() {
       {moreOpen && (
         <Modal title="More" onClose={() => setMoreOpen(false)}>
             <div className="grid grid-cols-3 gap-3">
-              {more.map(({ to, short, icon: Icon }) => (
+              {more.map(({ to, label, icon: Icon }) => (
                 <NavLink
                   key={to}
                   to={to}
@@ -62,7 +63,7 @@ export default function BottomNav() {
                   className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-2xl bg-slate-50 text-xs font-semibold text-slate-700 active:bg-slate-100"
                 >
                   <Icon size={22} className="text-navy-700" />
-                  {short}
+                  {label}
                 </NavLink>
               ))}
               <button
