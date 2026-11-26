@@ -41,8 +41,41 @@ data-exports/
 *.pk8
 # Firebase Admin credentials belong only in server environment secrets.
 **/*service-account*.json
+**/*service_account*.json
 **/serviceAccount*.json
 **/*firebase-adminsdk*.json
+**/*service-account*.json.*
+**/*service_account*.json.*
+**/serviceAccount*.json.*
+**/*firebase-adminsdk*.json.*
+
+# Local credential files and copies at any directory depth.
+google-services.json
+google-services.json.*
+credentials.json
+credentials.json.*
+credentials-*.json
+credentials_*.json
+credentials-*.json.*
+credentials_*.json.*
+*.bak.*
+*.backup.*
+
+# Private SSH keys and local SSH configuration.
+.ssh/
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+id_ecdsa_sk
+id_ed25519_sk
+id_rsa.*
+id_dsa.*
+id_ecdsa.*
+id_ed25519.*
+id_ecdsa_sk.*
+id_ed25519_sk.*
+*.ppk
 .codex/
 .agents/
 
@@ -54,8 +87,12 @@ frontend/android/app/release/
 # Android signing credentials
 *.jks
 *.keystore
+*.jks.*
+*.keystore.*
 **/key.properties
 **/keystore.properties
+**/key.properties.*
+**/keystore.properties.*
 
 # Android Studio local files
 **/.idea/
