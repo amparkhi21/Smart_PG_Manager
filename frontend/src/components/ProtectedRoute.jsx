@@ -3,10 +3,12 @@ import { Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import ErrorState from './ui/ErrorState.jsx';
 import RoleSelection from '../pages/RoleSelection.jsx';
+import BrandMark from './BrandMark.jsx';
 import { sessionHome, ownerReturnPath } from '../utils/authRouting.js';
 
 const FullScreenLoader = () => (
   <div className="flex min-h-dvh flex-col items-center justify-center gap-3 text-navy-700" role="status">
+    <BrandMark />
     <Loader2 className="animate-spin" size={32} />
     <p className="text-sm">Restoring your session…</p>
   </div>

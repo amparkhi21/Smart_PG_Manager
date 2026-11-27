@@ -5,6 +5,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute, PublicRoute } from './components/ProtectedRoute.jsx';
 import AppLayout from './layouts/AppLayout.jsx';
 import ResidentLayout from './layouts/ResidentLayout.jsx';
+import BrandMark from './components/BrandMark.jsx';
 
 const Register = lazy(() => import('./pages/Register.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
@@ -35,7 +36,7 @@ const Requests = lazy(() => import('./pages/Requests.jsx'));
 
 export default function App() {
   return (
-    <Suspense fallback={<div className="grid min-h-dvh place-items-center text-sm text-slate-500" role="status">Loading page…</div>}>
+    <Suspense fallback={<div className="grid min-h-dvh place-items-center text-sm text-slate-500" role="status"><div className="flex flex-col items-center gap-3"><BrandMark />Loading page…</div></div>}>
       <Routes>
         <Route element={<PublicRoute />}>
           <Route path="/login" element={<Login />} />

@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="frontend/public/brand/smart-pg-icon.svg" width="88" alt="Smart PG Manager logo">
+  <img src="frontend/public/brand/smart-pg-icon.png" width="88" alt="Smart PG Manager logo">
   <h1>Smart PG Manager</h1>
   <p><strong>Property operations, resident services and daily meal planning in one place.</strong></p>
   <p>A full-stack web application with a Capacitor Android client for paying guest accommodation.</p>

@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
-import { Building2, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
+import BrandMark from './BrandMark.jsx';
 import { NAV } from '../utils/nav.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -8,9 +9,7 @@ export default function Sidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col bg-navy-900 text-white lg:flex">
       <div className="flex items-center gap-3 px-6 py-6">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500">
-          <Building2 size={22} />
-        </div>
+        <BrandMark className="h-10 w-10" />
         <div className="leading-tight">
           <p className="font-extrabold">Smart PG</p>
           <p className="text-xs text-navy-200">Manager</p>
