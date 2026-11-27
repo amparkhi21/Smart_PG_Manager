@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { body, query } from 'express-validator';
-import { protect } from '../middleware/auth.js';
-import validate from '../middleware/validate.js';
-import { dateIn, monthIn } from '../middleware/validators.js';
+import { protect } from '../middlewares/auth.js';
+import validate from '../middlewares/validate.js';
+import { dateIn, monthIn } from '../middlewares/validators.js';
 import { getAttendance, markAttendance, getMonthlySummary } from '../controllers/attendanceController.js';
 
 const router = Router();

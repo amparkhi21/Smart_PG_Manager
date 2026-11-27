@@ -1,8 +1,6 @@
+import { CLAIM_STATUSES, BILL_TYPES } from '../constants.js';
 import mongoose from 'mongoose';
 import { notificationOutbox } from './notificationOutbox.js';
-
-export const CLAIM_STATUSES = ['Pending Verification', 'Approved', 'Rejected', 'Cancelled'];
-export const BILL_TYPES = ['Rent', 'Electricity'];
 
 // A resident's *claim* that they paid. It is never proof of payment and changes no balance until
 // the owner approves it; approval records the payment through the existing atomic payment logic.

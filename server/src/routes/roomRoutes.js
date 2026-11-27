@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { body, query } from 'express-validator';
-import { protect } from '../middleware/auth.js';
-import validate from '../middleware/validate.js';
-import { idParam } from '../middleware/validators.js';
+import { protect } from '../middlewares/auth.js';
+import validate from '../middlewares/validate.js';
+import { idParam } from '../middlewares/validators.js';
 import { listRooms, getRoom, createRoom, updateRoom, deleteRoom } from '../controllers/roomController.js';
 
 const router = Router();

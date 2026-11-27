@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import rateLimit from 'express-rate-limit';
-import { protect, protectResident } from '../middleware/auth.js';
-import validate from '../middleware/validate.js';
-import { COMPLAINT_CATEGORIES, COMPLAINT_PRIORITIES, COMPLAINT_STATUSES } from '../models/Complaint.js';
+import { protect, protectResident } from '../middlewares/auth.js';
+import validate from '../middlewares/validate.js';
+import { COMPLAINT_CATEGORIES, COMPLAINT_PRIORITIES, COMPLAINT_STATUSES } from '../constants.js';
 import { createComplaint, listComplaints, getComplaint, getComplaintHistory, addComplaintComment, updateComplaintStatus, reopenComplaint } from '../controllers/complaintController.js';
 
 function complaintRoutes(ownerView) {

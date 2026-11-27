@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { body, query } from 'express-validator';
-import { protect } from '../middleware/auth.js';
-import validate from '../middleware/validate.js';
-import { idParam, monthIn, paymentRules } from '../middleware/validators.js';
-import { PAYMENT_STATUSES } from '../utils/billing.js';
+import { protect } from '../middlewares/auth.js';
+import validate from '../middlewares/validate.js';
+import { idParam, monthIn, paymentRules } from '../middlewares/validators.js';
+import { PAYMENT_STATUSES } from '../constants.js';
 import { generateRent, listRent, getRent, addRentPayment } from '../controllers/rentController.js';
 
 const router = Router();

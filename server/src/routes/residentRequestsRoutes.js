@@ -1,12 +1,10 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { body, param, query } from 'express-validator';
-import { protectResident } from '../middleware/auth.js';
-import validate from '../middleware/validate.js';
-import {
-  listUnifiedRequests, getUnifiedRequest, createGeneralRequest, cancelGeneralRequest,
-  validateRequestQuery, validateGeneralRequestBody,
-} from '../controllers/requestsController.js';
+import { protectResident } from '../middlewares/auth.js';
+import validate from '../middlewares/validate.js';
+import { listUnifiedRequests, getUnifiedRequest, createGeneralRequest, cancelGeneralRequest } from '../controllers/requestsController.js';
+import { validateRequestQuery, validateGeneralRequestBody } from '../middlewares/requestValidators.js';
 
 const router = Router();
 router.use(protectResident());

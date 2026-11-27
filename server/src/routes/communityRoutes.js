@@ -1,12 +1,11 @@
 import express, { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import rateLimit from 'express-rate-limit';
-import { protect, protectResident, verifySession } from '../middleware/auth.js';
-import validate from '../middleware/validate.js';
-import { MESSAGE_MAX_LENGTH, COMMUNITY_ISSUE_CATEGORIES, COMMUNITY_ISSUE_STATUSES } from '../models/CommunityMessage.js';
-import { listCommunityMessages, createCommunityMessage, deleteCommunityMessage, listCommunityIssues, createCommunityIssue,
-  getCommunityIssue, addCommunityIssueComment, updateCommunityIssueStatus, deleteCommunityIssue } from '../controllers/communityController.js';
-import { IMAGE_MAX_BYTES } from '../utils/communityImages.js';
+import { protect, protectResident, verifySession } from '../middlewares/auth.js';
+import validate from '../middlewares/validate.js';
+import { MESSAGE_MAX_LENGTH, COMMUNITY_ISSUE_CATEGORIES, COMMUNITY_ISSUE_STATUSES } from '../constants.js';
+import { listCommunityMessages, createCommunityMessage, deleteCommunityMessage, listCommunityIssues, createCommunityIssue, getCommunityIssue, addCommunityIssueComment, updateCommunityIssueStatus, deleteCommunityIssue } from '../controllers/communityController.js';
+import { IMAGE_MAX_BYTES } from '../constants.js';
 import { shareCommunityImage, getCommunityImage } from '../controllers/communityImageController.js';
 import { listNotices, createNotice, updateNotice, deleteNotice, markNoticesRead } from '../controllers/noticeController.js';
 

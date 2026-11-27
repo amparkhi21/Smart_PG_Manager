@@ -10,7 +10,8 @@ import { createApp } from '../src/app.js';
 import Owner from '../src/models/Owner.js';
 import Room from '../src/models/Room.js';
 import Resident from '../src/models/Resident.js';
-import CommunityMessage, { MESSAGE_MAX_LENGTH } from '../src/models/CommunityMessage.js';
+import CommunityMessage from '../src/models/CommunityMessage.js';
+import { MESSAGE_MAX_LENGTH } from '../src/constants.js';
 import generateToken, { generateResidentToken } from '../src/utils/generateToken.js';
 
 test('Phase 4A private community API on disposable MongoDB', { timeout: 120000 }, async (t) => {

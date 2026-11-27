@@ -1,9 +1,8 @@
+import { LEAVE_STATUSES } from '../constants.js';
 import mongoose from 'mongoose';
 import { isRealDate } from '../utils/dates.js';
 import { notificationOutbox } from './notificationOutbox.js';
 
-export const LEAVE_STATUSES = ['Pending', 'Approved', 'Rejected', 'Cancelled'];
-export const ACTIVE_LEAVE_STATUSES = ['Pending', 'Approved'];
 export const leaveDurationDays = (fromDate, toDate) => (new Date(`${toDate}T00:00:00Z`) - new Date(`${fromDate}T00:00:00Z`)) / 86400000 + 1;
 
 const historySchema = new mongoose.Schema({

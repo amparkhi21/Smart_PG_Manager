@@ -9,7 +9,8 @@ import { createApp } from '../src/app.js';
 import Owner from '../src/models/Owner.js';
 import Room from '../src/models/Room.js';
 import Resident from '../src/models/Resident.js';
-import MessMenu, { MEAL_KEYS } from '../src/models/MessMenu.js';
+import MessMenu from '../src/models/MessMenu.js';
+import { MEAL_KEYS } from '../src/constants.js';
 import generateToken, { generateResidentToken } from '../src/utils/generateToken.js';
 import { todayIST } from '../src/utils/dates.js';
 

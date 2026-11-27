@@ -11,7 +11,7 @@ android {
         applicationId "com.smartpgmanager.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
+        versionCode 4
         versionName "2.1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField "boolean", "FCM_CLIENT_CONFIGURED", hasGoogleServicesConfig.toString()

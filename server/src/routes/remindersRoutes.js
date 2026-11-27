@@ -1,14 +1,10 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { body, query } from 'express-validator';
-import { protect } from '../middleware/auth.js';
-import validate from '../middleware/validate.js';
-import { idParam, monthIn } from '../middleware/validators.js';
-import {
-  createReminderDraft,
-  listReminderActivity,
-  updateReminderActivity,
-} from '../controllers/remindersController.js';
+import { protect } from '../middlewares/auth.js';
+import validate from '../middlewares/validate.js';
+import { idParam, monthIn } from '../middlewares/validators.js';
+import { createReminderDraft, listReminderActivity, updateReminderActivity } from '../controllers/remindersController.js';
 
 const router = Router();
 const reminderActionLimiter = rateLimit({

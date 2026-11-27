@@ -14,12 +14,13 @@ import Complaint from '../src/models/Complaint.js';
 import ComplaintEvent from '../src/models/ComplaintEvent.js';
 import RentRecord from '../src/models/RentRecord.js';
 import PaymentClaim from '../src/models/PaymentClaim.js';
-import Notification, { NOTIFICATION_TARGETS } from '../src/models/Notification.js';
+import Notification from '../src/models/Notification.js';
+import { NOTIFICATION_TARGETS } from '../src/constants.js';
 import PushDevice from '../src/models/PushDevice.js';
 import PushDelivery from '../src/models/PushDelivery.js';
 import { firebaseProvider, firebaseStatus } from '../src/config/firebase.js';
 import { encryptPushToken, decryptPushToken, tokenHash } from '../src/utils/pushTokens.js';
-import { dispatchPushNotifications, waitForPushDeliveries } from '../src/utils/pushNotifications.js';
+import { dispatchPushNotifications, waitForPushDeliveries } from '../src/services/pushNotificationService.js';
 import generateToken, { generateResidentToken } from '../src/utils/generateToken.js';
 import { todayIST } from '../src/utils/dates.js';
 

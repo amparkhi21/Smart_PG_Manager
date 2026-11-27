@@ -15,7 +15,7 @@ export default function PushNotificationSettings() {
         <h2 id="push-settings-title" className="text-lg font-bold text-navy-900">Android push notifications</h2>
         <p className="mt-1 text-sm text-slate-600">Permission: {permissionLabel}. In-app notifications continue to work when push is off.</p>
         <label className="mt-4 flex min-h-11 items-center gap-3 text-sm font-semibold text-slate-800">
-          <input type="checkbox" checked={enabled} disabled={busy || !accountReady || firebaseConfigured !== true || registrationConflict}
+          <input type="checkbox" checked={enabled} disabled={busy || !accountReady || firebaseConfigured !== true || permission === 'unknown' || registrationConflict}
             onChange={(event) => event.target.checked ? enable() : disable()} className="h-5 w-5 accent-teal-600" />
           Enable Push Notifications
         </label>

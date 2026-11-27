@@ -10,6 +10,7 @@ import ErrorState from '../components/ui/ErrorState.jsx';
 import Skeleton from '../components/ui/Skeleton.jsx';
 import { Field, Input } from '../components/ui/FormControls.jsx';
 import ResidentFormModal from '../components/residents/ResidentFormModal.jsx';
+import { copyText } from '../native/external.js';
 
 const compactPhone = (value = '') => value.replace(/[\s().-]/g, '');
 
@@ -17,7 +18,7 @@ function ContactPhone({ number, label }) {
   if (!number) return <span className="text-slate-400">Not provided</span>;
   const phone = compactPhone(number);
   const copy = async () => {
-    try { await navigator.clipboard.writeText(number); toast.success('Phone number copied'); }
+    try { await copyText(number); toast.success('Phone number copied'); }
     catch { toast.error('Could not copy the phone number. Select and copy it manually.'); }
   };
   return <div className="flex min-w-0 flex-wrap items-center gap-1">

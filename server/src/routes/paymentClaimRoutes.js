@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
-import { protect } from '../middleware/auth.js';
-import validate from '../middleware/validate.js';
-import { CLAIM_STATUSES, BILL_TYPES } from '../models/PaymentClaim.js';
+import { protect } from '../middlewares/auth.js';
+import validate from '../middlewares/validate.js';
+import { CLAIM_STATUSES, BILL_TYPES } from '../constants.js';
 import { listClaims, approveClaim, rejectClaim } from '../controllers/paymentClaimController.js';
 
 // Owner-only. `protect` rejects resident tokens, so a resident can never review (or approve) a claim.

@@ -1,7 +1,7 @@
+import { IMAGE_MAX_BYTES } from '../constants.js';
 import mongoose from 'mongoose';
 import ApiError from './ApiError.js';
 
-export const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const imageBucket = () => new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'communityImages' });
 
 export function imageType(buffer) {

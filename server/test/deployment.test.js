@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 import express from 'express';
 import { createApp } from '../src/app.js';
 import { clientOrigins, validateEnv } from '../src/config/env.js';
-import { errorHandler } from '../src/middleware/errorHandler.js';
+import { errorHandler } from '../src/middlewares/errorHandler.js';
 import Owner from '../src/models/Owner.js';
 
 const productionEnv = () => ({

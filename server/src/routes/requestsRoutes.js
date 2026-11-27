@@ -1,11 +1,9 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
-import { protect } from '../middleware/auth.js';
-import validate from '../middleware/validate.js';
-import {
-  listUnifiedRequests, getUnifiedRequest, updateGeneralRequest,
-  validateRequestQuery, validateRequestOwnerBody,
-} from '../controllers/requestsController.js';
+import { protect } from '../middlewares/auth.js';
+import validate from '../middlewares/validate.js';
+import { listUnifiedRequests, getUnifiedRequest, updateGeneralRequest } from '../controllers/requestsController.js';
+import { validateRequestQuery, validateRequestOwnerBody } from '../middlewares/requestValidators.js';
 
 const router = Router();
 router.use(protect);

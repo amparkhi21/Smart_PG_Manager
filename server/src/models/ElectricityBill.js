@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
-import { round2, computeStatus, PAYMENT_METHODS, PAYMENT_STATUSES } from '../utils/billing.js';
+import { round2, computeStatus } from '../utils/billing.js';
+import { PAYMENT_METHODS, PAYMENT_STATUSES } from '../constants.js';
 
 const paymentSchema = new mongoose.Schema({
   amount: { type: Number, required: true, min: [1, 'Payment must be at least 1'] },

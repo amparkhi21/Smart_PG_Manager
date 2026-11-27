@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { COMPLAINT_STATUSES } from './Complaint.js';
+import { COMPLAINT_STATUSES } from '../constants.js';
 import { notificationOutbox } from './notificationOutbox.js';
 
 // A private append-only timeline, kept outside the complaint so history can grow and be paginated.

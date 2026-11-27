@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
-import { round2, computeStatus, PAYMENT_METHODS, PAYMENT_STATUSES } from '../utils/billing.js';
+import { round2, computeStatus } from '../utils/billing.js';
+import { PAYMENT_METHODS, PAYMENT_STATUSES } from '../constants.js';
 
 // Each payment is its own sub-document. Payments are only ever appended,
 // never edited or overwritten, so history is always preserved.

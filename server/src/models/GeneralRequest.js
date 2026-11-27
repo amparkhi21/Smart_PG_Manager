@@ -1,8 +1,5 @@
+import { GENERAL_REQUEST_CATEGORIES, GENERAL_REQUEST_PRIORITIES, GENERAL_REQUEST_STATUSES } from '../constants.js';
 import mongoose from 'mongoose';
-
-export const GENERAL_REQUEST_CATEGORIES = ['Maintenance', 'Private Issue', 'Other / General'];
-export const GENERAL_REQUEST_PRIORITIES = ['Low', 'Normal', 'High', 'Urgent'];
-export const GENERAL_REQUEST_STATUSES = ['Open', 'In Progress', 'Resolved', 'Rejected', 'Cancelled'];
 
 const responseSchema = new mongoose.Schema({
   owner: { type: mongoose.Schema.Types.ObjectId, ref: 'Owner', required: true },

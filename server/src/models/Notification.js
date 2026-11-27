@@ -1,22 +1,5 @@
+import { NOTIFICATION_TARGETS } from '../constants.js';
 import mongoose from 'mongoose';
-
-export const NOTIFICATION_TARGETS = {
-  complaint_created: ['owner', '/requests'],
-  complaint_status_updated: ['resident', '/resident/requests'],
-  complaint_response: ['resident', '/resident/requests'],
-  room_change_requested: ['owner', '/room-change-requests'],
-  room_change_approved: ['resident', '/resident/room-change-requests'],
-  room_change_rejected: ['resident', '/resident/room-change-requests'],
-  leave_requested: ['owner', '/leave-requests'],
-  leave_approved: ['resident', '/resident/leave-requests'],
-  leave_rejected: ['resident', '/resident/leave-requests'],
-  payment_claim_submitted: ['owner', '/payment-requests'],
-  payment_approved: ['resident', '/resident/payments'],
-  payment_rejected: ['resident', '/resident/payments'],
-  notice_published: ['resident', '/resident/notices'],
-  rent_due: ['resident', '/resident/payments'],
-  bill_due: ['resident', '/resident/payments'],
-};
 
 const schema = new mongoose.Schema({
   owner: { type: mongoose.Schema.Types.ObjectId, ref: 'Owner', required: true, immutable: true },

@@ -1,9 +1,8 @@
+import { MEAL_KEYS, SERVING_TIME_RE } from '../constants.js';
 import mongoose from 'mongoose';
 import { isRealDate } from '../utils/dates.js';
 
-export const MEAL_KEYS = ['breakfast', 'lunch', 'eveningSnacks', 'dinner'];
 // Local Indian time: HH:mm, or a serving window such as 08:00-09:00.
-export const SERVING_TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d(?:-(?:[01]\d|2[0-3]):[0-5]\d)?$/;
 
 const mealSchema = new mongoose.Schema({
   items: {

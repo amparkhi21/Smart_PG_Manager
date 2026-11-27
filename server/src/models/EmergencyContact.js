@@ -1,7 +1,6 @@
+import { CONTACT_CATEGORIES } from '../constants.js';
 import mongoose from 'mongoose';
 import { normalizePhone } from '../utils/residentAuth.js';
-
-export const CONTACT_CATEGORIES = ['PG Owner', 'Caretaker', 'Security', 'Maintenance', 'Medical', 'Police', 'Fire', 'Other'];
 
 export function normalizeContactPhone(value) {
   if (typeof value !== 'string' || value.length > 50) return null;

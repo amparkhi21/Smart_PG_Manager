@@ -1,219 +1,349 @@
-# Smart PG Manager
+<div align="center">
+  <img src="frontend/public/brand/smart-pg-icon.svg" width="88" alt="Smart PG Manager logo">
+  <h1>Smart PG Manager</h1>
+  <p><strong>Property operations, resident services and daily meal planning in one place.</strong></p>
+  <p>A full-stack web application with a Capacitor Android client for paying guest accommodation.</p>
+  <p>
+    <a href="https://smart-pg-manager.vercel.app">Live website</a> ·
+    <a href="https://github.com/amparkhi21/Smart_PG_Manager/releases/tag/v1.0.0">Existing Android release</a> ·
+    <a href="#screenshots">Screenshots</a> ·
+    <a href="#local-development">Local setup</a>
+  </p>
+  <p>
+    <img src="https://img.shields.io/badge/React-18-149ECA?logo=react&logoColor=white" alt="React 18">
+    <img src="https://img.shields.io/badge/Node.js-24-43853D?logo=nodedotjs&logoColor=white" alt="Node.js 24">
+    <img src="https://img.shields.io/badge/Express-4-222222?logo=express&logoColor=white" alt="Express 4">
+    <img src="https://img.shields.io/badge/MongoDB-Mongoose-116149?logo=mongodb&logoColor=white" alt="MongoDB and Mongoose">
+    <img src="https://img.shields.io/badge/Capacitor-8-119EFF?logo=capacitor&logoColor=white" alt="Capacitor 8">
+  </p>
+</div>
 
-A responsive application for paying guest (PG) property owners to manage rooms, residents, attendance, rent, electricity bills, payments, and reports.
+## Overview
 
-[Frontend](https://smart-pg-manager.vercel.app) · [API health](https://smart-pg-manager-backend.onrender.com/api/health) · [Deployment instructions](#deployment-and-data)
+PG owners often manage occupancy, rent, attendance and resident requests across spreadsheets, messages and paper records. Residents have to ask for the same room, bill and meal information repeatedly.
 
-## Features
+Smart PG Manager brings these workflows into separate owner and resident portals. Owners manage property operations and review requests; residents access their own records, submit requests and follow updates. An optional Gemini-powered planner helps owners prepare daily mess menus while keeping review and publication under their control.
 
-- **Owner accounts:** registration, login, JWT sessions, protected pages, and owner-scoped API queries.
-- **Dashboard:** occupancy, collections, outstanding balances, recent payments, and upcoming dues.
-- **Rooms and residents:** capacity checks, room assignments, resident profiles, and preserved history when residents leave.
-- **Attendance:** daily and bulk marking, notes, and monthly summaries.
-- **Rent:** monthly generation, partial and full payments, atomic balance checks, and payment retry IDs.
-- **Electricity:** meter readings, calculated room bills, installment payments, and payment history.
-- **Receipts:** downloadable rent and electricity PDFs tied to saved payment IDs. Receipts identify payments as recorded; they do not verify bank settlement or serve as tax invoices.
-- **Reminders:** editable WhatsApp drafts, click-to-chat links, duplicate warnings, and owner-reported activity. Sending remains manual.
-- **Settings:** property details, future billing defaults, reminder preferences, and message templates.
-- **Reports:** monthly financial summaries and PDFs, with billing-month collections separated from transaction-date receipts in Asia/Kolkata.
-- **CSV exports:** rooms, residents, attendance, rent records, rent payments, electricity bills, electricity payments, and monthly summaries. Resident contact fields are excluded and formula-leading text is escaped.
+**Explore:** [Owner sign-in](https://smart-pg-manager.vercel.app/owner/login) · [Resident sign-in](https://smart-pg-manager.vercel.app/resident/login)
 
-## Technology
+## Owner portal
 
-| Layer | Stack |
+| Area | Capabilities |
 | --- | --- |
-| Frontend | React 18, Vite 6, Tailwind CSS, React Router, Axios |
-| Backend | Node.js 24, Express 4, Mongoose, JWT |
-| Database | MongoDB Atlas |
-| Charts and documents | Recharts, jsPDF |
+| Dashboard | Room occupancy, collections, outstanding dues, recent payments and deadlines. |
+| Rooms and residents | Capacity and bed assignments, resident profiles, contact search, account activation/reset and preserved departure history. |
+| Unified Requests | Payment verification, room/bed changes, leave, maintenance and private issues with status and response history. |
+| Attendance | Daily and bulk marking, room filters and monthly summaries. |
+| Billing | Monthly rent, room electricity readings, partial payments, payment history and recorded-payment receipts. |
+| Community | Notices, community messages and authorized photo access. |
+| Communication | In-app notifications, optional Android push and editable WhatsApp reminder drafts; sending remains manual. |
+| Reporting | Monthly summaries, PDF reports and eight CSV export formats. |
+| Settings | Property details, billing defaults, UPI details and reminder preferences. |
+
+## Resident portal
+
+- Sign in using the hostel, room, bed and individual password supplied through the owner-managed account workflow.
+- View personal dashboard, profile, assigned room and available rooms.
+- Follow recorded attendance and rent/electricity information.
+- Submit payment-verification, room-change, leave and service requests; read decisions and replies.
+- Read published daily menus, notices, community updates and account notifications.
+- Change passwords and optionally enable Android push notifications.
+
+Residents see account-scoped data. Shared electricity is shown as room totals when no individual share has been assigned. A submitted payment claim is not treated as a confirmed payment until the owner verifies receipt.
+
+## AI Daily Mess Menu Planner
+
+The optional server-side Gemini integration creates ideas for **one date**: all four meals together, or individual meal suggestions.
+
+- Vegetarian/non-vegetarian choices, healthy/budget/high-protein preferences and optional per-person budgets.
+- Hindi, English or Hinglish instructions and recent saved-menu context for variety.
+- Editable previews and regeneration of individual meal cards.
+- Explicit owner confirmation before saving or overwriting a published menu.
+- Validated provider responses, bounded timeouts and actionable error recovery.
+
+AI suggestions are advisory; exact prices, nutrition and non-repetition are not guaranteed. Gemini credentials remain on the server. Missing AI configuration does not prevent manual menu management.
+
+## Android application
+
+The Android client packages the React application with Capacitor and adds native Back handling, safe-area/keyboard support, secure session storage, clipboard/external-link handoff and PDF/CSV sharing.
+
+| Local application identity | Value |
+| --- | --- |
+| Package ID | `com.smartpgmanager.app` |
+| Version / code | `2.1.0` / `4` |
+| Minimum / target Android API | `24` / `36` |
+| WebView origin | `https://localhost` |
+
+The [existing published Android release is v1.0.0](https://github.com/amparkhi21/Smart_PG_Manager/releases/tag/v1.0.0). It is separate from the local **2.1.0 debug build**; this README does not claim a signed 2.1.0 release has been published. Physical-device acceptance and real push-delivery checks remain pending.
+
+## Technology stack
+
+| Layer | Technologies |
+| --- | --- |
+| Frontend | React 18, Vite 6, Tailwind CSS 4, React Router, Axios, Lucide |
+| Visualization and exports | Recharts, jsPDF, browser downloads and native sharing |
+| Backend | Node.js 24, Express 4, Mongoose, express-validator |
+| Authentication | JWT, bcrypt password hashing, owner/resident authorization |
+| Database | MongoDB; production hosting uses Atlas |
+| AI and push | Google GenAI SDK; optional Firebase Admin and Capacitor Push Notifications |
+| Android | Capacitor 8, Java 21, Gradle and Android SDK |
+| Verification | Node test runner, Playwright, disposable MongoDB instances |
 | Hosting | Vercel frontend, Render API |
 
-## 🌐 Live Website & Android App
+## System architecture
 
-- [Live Website](https://smart-pg-manager.vercel.app)
-- [Download Android App](https://github.com/amparkhi21/Smart_PG_Manager/releases/latest)
+```mermaid
+flowchart LR
+    Browser[Owner and resident browsers] --> Web[React SPA on Vercel]
+    Android[Capacitor Android app] --> API[Express REST API on Render]
+    Web -->|HTTPS and bearer JWT| API
+    API --> DB[(MongoDB Atlas)]
+    API -->|Optional menu generation| Gemini[Gemini API]
+    API -->|Optional notification delivery| FCM[Firebase Cloud Messaging]
+    FCM --> Android
+    Android --> Native[Android Keystore, sharing and external apps]
+```
 
-## Getting started
+The browser and Android client share the API. Authorization, tenant scoping and business validation run on the server. AI previews require a separate owner-confirmed save before becoming resident-visible menus.
 
-Use **Node.js 24** and npm. In Windows PowerShell, use `npm.cmd` if execution policy blocks `npm.ps1`.
+## Project structure
 
-Both [frontend/package.json](frontend/package.json) and [server/package.json](server/package.json) declare `engines.node` as `24.x`, matching their lockfiles. A root `.node-version` file is not required. An existing Render `NODE_VERSION` setting overrides the package declaration; keep it at `24` if configured.
+Current checked-out layout; ignored dependencies, local credentials and generated outputs are omitted below.
 
-Install the locked dependencies from the repository root:
+```text
+smart-pg-manager/
+├── docs/
+│   ├── architecture/          # Project boundaries
+│   ├── operations/            # Verification and diagnostic runbooks
+│   ├── android/               # Build, device testing and Firebase
+│   ├── archive/               # Historical Android implementation records
+│   └── screenshots/           # Actual UI captures with synthetic demo data
+├── frontend/
+│   ├── android/               # Native Android project
+│   ├── e2e/                   # Browser regression specifications
+│   ├── public/brand/          # Project logo
+│   ├── scripts/               # Branding and production artifact checks
+│   ├── src/
+│   │   ├── api/, components/, context/, hooks/
+│   │   ├── layouts/, native/, pages/, utils/
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   ├── capacitor.config.json
+│   ├── playwright*.config.js
+│   ├── vercel.json
+│   └── package.json
+├── server/
+│   ├── scripts/               # Database, startup and repository diagnostics
+│   ├── src/
+│   │   ├── config/, controllers/, middlewares/
+│   │   ├── models/, routes/, seed/, utils/
+│   │   ├── app.js             # Express application composition
+│   │   ├── services/          # Business operations, Gemini and notification workers
+│   │   ├── constants.js       # Shared enums and configuration defaults
+│   │   └── index.js           # Startup, push worker and graceful shutdown
+│   ├── test/                  # Isolated backend regressions
+│   ├── .env.example
+│   └── package.json
+├── render.yaml
+└── README.md
+```
 
-```sh
+Both applications have their own `package-lock.json`. Actual `.env` files, Firebase client configuration, signing material, caches and builds remain local and ignored.
+
+## Screenshots
+
+Actual application captures from a disposable local MongoDB database. All people, contacts, accounts and financial records shown are synthetic demo data. The AI preview uses deterministic demo output, not a live provider response. Desktop captures and the mobile browser capture do not establish physical Android-device testing.
+
+### Owner operations
+
+| Dashboard | Resident management |
+| --- | --- |
+| ![Owner dashboard with demo occupancy and billing totals](docs/screenshots/owner-dashboard.png) | ![Resident management with synthetic demo residents](docs/screenshots/resident-management.png) |
+
+| Unified Requests | Attendance |
+| --- | --- |
+| ![Unified Requests showing a demo maintenance request](docs/screenshots/unified-requests.png) | ![Daily attendance for synthetic residents](docs/screenshots/attendance.png) |
+
+### Billing and meal planning
+
+| Rent management | AI menu preview |
+| --- | --- |
+| ![Rent billing and recorded demo payments](docs/screenshots/rent-billing.png) | ![Actual AI planner UI displaying deterministic demo meal suggestions](docs/screenshots/ai-menu-planner.png) |
+
+### Resident portal on a mobile viewport
+
+<img src="docs/screenshots/resident-portal-mobile.png" width="350" alt="Resident dashboard on a mobile browser viewport with synthetic demo records">
+
+## Local development
+
+**Prerequisites:** Node.js 24, npm and an isolated development MongoDB database. Use a local replica set or a dedicated development Atlas database for transaction-backed workflows. Android builds additionally require JDK 21 and Android SDK 36. Playwright uses Microsoft Edge by default on Windows; `PLAYWRIGHT_CHANNEL` can select another installed channel.
+
+```bash
+git clone https://github.com/amparkhi21/Smart_PG_Manager.git
+cd Smart_PG_Manager
 npm ci --prefix server
 npm ci --prefix frontend
 ```
 
-If local environment files are missing, copy [server/.env.example](server/.env.example) to `server/.env` and [frontend/.env.example](frontend/.env.example) to `frontend/.env`. Preserve any existing configuration and fill in placeholders privately.
+Create `server/.env` and `frontend/.env` from the corresponding `.env.example` files **only if those local files do not already exist**. Fill placeholders privately. Do not overwrite existing credentials or use the production database for demo writes.
 
-| Package | Local configuration |
-| --- | --- |
-| Backend | `NODE_ENV=development`, `PORT=5000`, a valid `MONGO_URI`, a unique `JWT_SECRET` of at least 32 characters, `JWT_EXPIRES_IN=7d`, `CLIENT_URL=http://localhost:5173` |
-| Frontend | `VITE_API_BASE_URL=http://localhost:5000/api`; when unset in development, Vite proxies `/api` to port 5000 |
+Run in separate terminals from the repository root:
 
-Run the API and frontend in separate terminals:
-
-```sh
+```bash
 npm run dev --prefix server
 ```
 
-```sh
+```bash
 npm run dev --prefix frontend
 ```
 
-Open `http://localhost:5173`. Use an isolated development database for write testing. The optional `npm run seed --prefix server` command creates demo data and replaces the demo account's existing records; use it only with a disposable development database.
+Open `http://localhost:5173`. On Windows PowerShell, use `npm.cmd`/`npx.cmd` if script execution policy blocks `npm`/`npx`. The optional seed command replaces its demo account's records; use it only with a disposable development database.
 
-## Tests and production build
+## Environment configuration
 
-Run from the repository root:
+These are documentation placeholders, not working credentials. The complete templates are [server/.env.example](server/.env.example) and [frontend/.env.example](frontend/.env.example).
 
-```sh
-npm test --prefix server
+| Backend variable | Safe example / purpose |
+| --- | --- |
+| `NODE_ENV` | `development` locally; `production` on Render |
+| `PORT` | `5000` locally; supplied by Render in production |
+| `MONGO_URI` | `mongodb+srv://<db-user>:<url-encoded-password>@<atlas-host>/<development-database>` |
+| `JWT_SECRET` | `<unique-random-secret-at-least-32-characters>` |
+| `JWT_EXPIRES_IN` | `7d` |
+| `CLIENT_URL` | `http://localhost:5173`; exact comma-separated approved origins |
+| `GEMINI_API_KEY` | `<server-only-gemini-key>`; optional |
+| `GEMINI_MODEL` | `<supported-model-id>`; optional override of the configured default |
+| `FCM_ENABLED` | `false` until push is configured |
+| `FIREBASE_PROJECT_ID` | `<firebase-project-id>` |
+| `FIREBASE_CLIENT_EMAIL` | `<firebase-service-account-email>` |
+| `FIREBASE_PRIVATE_KEY` | `<server-only-private-key>`; never paste into client code |
+| `FCM_TOKEN_ENCRYPTION_KEY` | `<independent-random-32-byte-key-as-64-hex-characters>` |
+
+Frontend configuration:
+
+```dotenv
+# Local development only
+VITE_API_BASE_URL=http://localhost:5000/api
+```
+
+Production uses `https://smart-pg-manager-backend.onrender.com/api`. Production builds enforce HTTPS and resolve missing or loopback API values to that backend. Vite variables are public build-time configuration: never put secrets in a `VITE_` variable. Android requires the backend to allow the exact `https://localhost` origin alongside the existing website origins.
+
+## API modules
+
+All paths below are relative to the configured backend host.
+
+| Module | Route prefix |
+| --- | --- |
+| Authentication and sessions | `/api/auth` |
+| Property and resident management | `/api/rooms`, `/api/residents`, `/api/settings` |
+| Resident portal | `/api/resident` |
+| Unified Requests | `/api/requests`, `/api/resident/requests` |
+| Billing and payment verification | `/api/rent`, `/api/electricity`, `/api/payment-claims` |
+| Attendance and mess menus | `/api/attendance`, `/api/mess-menus` |
+| Community and notifications | `/api/community`, `/api/notifications` |
+| Reporting and reminders | `/api/reports`, `/api/reminders` |
+| Health and database readiness | `/api/health`, `/api/ready` |
+
+Feature-specific complaint, leave, room-change and emergency-contact APIs remain available. Legacy request-screen URLs redirect to the unified Requests screens. Response envelopes and access rules are exercised by the regression suites.
+
+## Authentication and security
+
+- JWT bearer sessions, bcrypt password hashing and owner/resident role checks.
+- Owner/PG-scoped queries and authorization checks on private records and mutations.
+- Owner-managed resident login access, first-login password changes and session revocation.
+- Transaction-aware occupancy/payment workflows, validation, rate limits, exact-origin CORS and security headers.
+- Android sessions encrypted with a non-exportable Keystore key; browser sessions retain the existing browser-storage behavior.
+- Explicit payment verification: resident-entered UTRs are claims, not proof of bank settlement.
+- CSV formula escaping and private, cache-backed Android export sharing.
+- Optional push with encrypted device tokens; private financial/request details stay out of lock-screen notification text.
+
+Credential files and signing keys are ignored by Git. **`server/.env` exists in earlier Git history:** current ignore rules do not remove that exposure. Review and rotate affected credentials through the existing deployment before a public release; coordinate JWT rotation because it expires saved sessions. No history rewrite is part of ordinary setup.
+
+## Automated verification
+
+Most recent completed local regression runs, **27 November 2026**:
+
+| Suite | Result |
+| --- | --- |
+| Backend regressions | **194 / 194 passed** |
+| Frontend unit tests | **72 / 72 passed** |
+| Isolated browser integrations | **19 / 19 passed** |
+| Mocked browser scenarios | **48 / 48 passed**, no skips |
+| Total | **333 passed** |
+
+The frontend production build, compiled API/PDF/CSV checks, Capacitor sync and Android debug build also passed in the preceding verification work. These are local results, not a hosted CI status or proof that the live deployment matches this checkout. Physical-device acceptance, real FCM delivery and a new signed release remain separate checks.
+
+Run unit tests and repository checks from the root:
+
+```bash
+npm test --prefix server -- --test-concurrency=1
 npm test --prefix frontend
-npm run build --prefix frontend
-npm run test:build --prefix frontend
-npm audit --audit-level=moderate --prefix server
-npm audit --audit-level=moderate --prefix frontend
 npm run check:repository --prefix server
+git diff --check
 ```
 
-The production output is `frontend/dist`. `npm run preview --prefix frontend` serves that build locally. To target a different backend, set `VITE_API_BASE_URL` to its public HTTPS URL ending in `/api` before building. Missing or loopback production values resolve to `https://smart-pg-manager-backend.onrender.com/api`; malformed URLs are rejected.
+Browser suites, from `frontend/` after installing both applications' dependencies:
 
-Tests cover API access control, configuration, CORS, sessions, model validation, payment updates, reporting, reminders, and exports using synthetic data and mocks. The production artifact check verifies compiled API URLs, receipt/report PDFs, all eight CSV formats, and reminder links. Hosted browser behavior and complete database workflows still need release acceptance testing.
-
-Run these checks locally before releasing. Vercel and Render use the deployment settings below; deployment does not require a GitHub Actions workflow.
-
-## Project structure
-
-```text
-frontend/
-  scripts/              Production artifact verification
-  src/
-    api/                API configuration and HTTP client
-    components/         Shared and feature-specific UI
-    context/            Authentication state
-    hooks/              Fetching and debounce helpers
-    layouts/            Application and authentication layouts
-    pages/              Application screens
-    utils/              Formatting, dates, receipts, reports, and reminders
-  vercel.json           Vercel build settings, headers, and SPA routing
-server/
-  scripts/              Read-only database and repository hygiene checks
-  src/
-    config/             Environment validation and database connection
-    controllers/        Request handlers
-    middleware/         Authentication, validation, and error handling
-    models/             MongoDB schemas
-    routes/             API endpoints
-    seed/               Optional development demo data
-    utils/              Shared billing, ownership, and date helpers
-  test/                 Backend automated tests
-render.yaml             Render service blueprint
+```bash
+npx playwright test phase android-runtime
+npx playwright test --config playwright.portal.config.js
+npx playwright test --config playwright.persistence.config.js
+npx playwright test --config playwright.ai-mess.config.js --grep-invert "real Gemini"
 ```
 
-## Deployment and data
+Integration suites create disposable local MongoDB instances. The live Gemini test is opt-in and excluded above. The default mocked-browser configuration creates a test-mode `dist`; **rebuild production assets before Capacitor sync or distribution**:
 
-Use the existing [Vercel project](https://smart-pg-manager.vercel.app) and [Render API service](https://smart-pg-manager-backend.onrender.com/api/health) when updating production. Keep [frontend/vercel.json](frontend/vercel.json), including its SPA rewrite and security headers. Keep [render.yaml](render.yaml) until the existing service is confirmed to be manually configured and independent of a Render Blueprint. Importing the Blueprint as a new service would create another deployment.
+```bash
+npm run build
+npm run test:build
+```
 
-Keep `.env` files, private keys, database backups, and resident data exports out of Git. **`server/.env` exists in earlier Git history.** Removing it from tracking does not remove that history; rotate the exposed database credentials and JWT secret before publishing or deploying. Coordinate rotation with the existing deployment because changing the JWT secret expires saved sessions.
+See [release verification and diagnostics](docs/operations/release-verification.md) for evidence handling and database isolation.
 
-Retain the existing Atlas project, cluster, database name, and records. Seed scripts, demo imports, resets, and production write tests are not part of deployment. Use an isolated database and synthetic owners for write and concurrency checks. Rewriting Git history is a separate maintenance operation.
+## Deployment architecture
 
-### Render backend
-
-| Setting | Value |
+| Service | Existing configuration |
 | --- | --- |
-| Branch / runtime | `main` / Node |
-| Root directory | `server` |
-| Build command | `npm ci --omit=dev` |
-| Start command | `npm start` |
-| Node version | `24` via `NODE_VERSION`; package engines require `24.x` |
-| Health check | `/api/ready` for this backend version |
-| Auto deploy | Off during manual release verification |
-| Persistent disk / pre-deploy command | None |
-| Blueprint region / plan | Singapore / Free |
+| Vercel web app | Root `frontend`; `npm ci`; `npm run build`; output `dist`; SPA routing/security headers in [frontend/vercel.json](frontend/vercel.json). |
+| Render API | Root `server`; `npm ci --omit=dev`; `npm start`; Node 24; readiness probe `/api/ready`. |
+| MongoDB Atlas | Existing database and records; credentials remain in server environment secrets. |
+| Android | Bundled frontend assets connect to the same HTTPS API using the Capacitor origin. |
 
-For an older running backend, keep its working health probe until deploying a version that supplies `/api/ready`. The server listens on `0.0.0.0`, uses Render's supplied `PORT`, and trusts one proxy hop. `GET /api/health` checks process liveness; `GET /api/ready` pings MongoDB and returns 503 when the connection is unavailable.
+[render.yaml](render.yaml) is the existing optional Blueprint configuration with automatic deployment disabled. Do not import it as a new service when updating the existing service. Keep `CLIENT_URL` origins exact, preserve the database name and use the Render service's outbound ranges in the Atlas access list. `/api/health` checks API liveness; `/api/ready` checks database connectivity.
 
-### Vercel frontend
+Root cleanup on 2026-11-27 retained this file: the live service's Blueprint association and configuration source could not be verified with the available access. Its optional label does not establish that production ignores it. Historical temporary evidence and backups are preserved in the [external archive](docs/archive/README.md); disposable project-local npm caches were removed. npm currently uses the Windows user-profile cache, and no project script or configuration requires `.npm-cache/`.
 
-| Setting | Value |
-| --- | --- |
-| Branch / framework | `main` / Vite |
-| Root directory | `frontend` |
-| Install command | `npm ci` |
-| Build command | `npm run build` |
-| Output directory | `dist` |
-| Node version | `24.x` |
-| Production variable | `VITE_API_BASE_URL=https://smart-pg-manager-backend.onrender.com/api` |
+## Android debug build
 
-Vite embeds the API URL at build time, so changing it requires a new build and deployment. The URL must use HTTPS, end in exactly one `/api`, and contain no credentials, query string, or fragment. Missing or loopback production values fall back to the existing Render API.
+With JDK 21 and Android SDK configured, run from the repository root in PowerShell:
 
-Configure Preview separately if needed. Add each exact approved Preview origin to Render's `CLIENT_URL`; wildcard Vercel origins are rejected. Review Git-triggered deployment settings before publishing a release commit.
+```powershell
+Push-Location frontend
+npm.cmd run build
+npx.cmd --no-install cap sync android
+Push-Location android
+$env:GRADLE_USER_HOME = Join-Path (Get-Location) '.gradle'
+.\gradlew.bat :app:assembleDebug --console=plain
+Pop-Location
+Pop-Location
+```
 
-### Production environment variables
+Check every command succeeds before continuing. Debug output:
 
-Backend secrets belong in Render and the ignored `server/.env`, never in Vercel or a `VITE_` variable. Vite variables are public bundle configuration.
+`frontend/android/app/build/outputs/apk/debug/app-debug.apk`
 
-| Host | Variable | Production setting |
-| --- | --- | --- |
-| Render | `NODE_ENV` | `production` |
-| Render | `PORT` | Supplied by Render; local fallback is `5000` |
-| Render | `MONGO_URI` | `mongodb+srv://<db-user>:<url-encoded-password>@<atlas-host>/<existing-database>?retryWrites=true&w=majority` |
-| Render | `JWT_SECRET` | A unique random secret of at least 32 characters |
-| Render | `JWT_EXPIRES_IN` | `7d` by default, or a positive duration such as `12h` |
-| Render | `CLIENT_URL` | `https://smart-pg-manager.vercel.app`; comma-separated exact HTTPS origins if needed |
-| Render | `NODE_VERSION` | `24` |
-| Vercel | `VITE_API_BASE_URL` | `https://smart-pg-manager-backend.onrender.com/api` |
+Keep the existing Firebase client configuration and signing material local. This command produces a debug APK, not a store-ready signed release. Follow the [Android build and device-testing checklist](docs/android/build-and-device-testing.md) and [Firebase push guide](docs/android/firebase-push.md) before release.
 
-`MONGO_URI` and `JWT_SECRET` are required. Production also requires `CLIENT_URL`. The Blueprint generates a JWT secret for a new service; preserve the configured secret when updating an existing service. Reminders use manual WhatsApp links and need no messaging-provider credentials. Never overwrite an existing `.env` while copying an example.
+## Documentation
 
-### MongoDB Atlas access
+- [Project structure and boundaries](docs/architecture/project-structure.md)
+- [Release verification and startup/database diagnostics](docs/operations/release-verification.md)
+- [Android build and physical-device testing](docs/android/build-and-device-testing.md)
+- [Firebase and Android push configuration](docs/android/firebase-push.md)
+- [Historical implementation records](docs/archive/README.md)
 
-Use an application database user scoped to the existing database. URL-encode special characters in the password and preserve the database name in the connection string.
+## Developer
 
-Allow the Render service's outbound CIDR ranges in Atlas's IP access list. Obtain them from the service's **Connect > Outbound** settings; avoid opening access to `0.0.0.0/0`. A successful local ping does not prove that Render has network access. MongoDB stores application records; Render's local filesystem is not database storage, and exports are generated in the browser.
+Built by **Parkhi Kumari**, a full-stack developer and B.Tech Computer Science & Engineering student specializing in AI & Data Science.
 
-`npm run check:db --prefix server` performs a read-only ping using the native MongoDB driver without loading application models or creating indexes. Keep real database credentials out of public CI.
-
-### Release procedure
-
-1. Review changes and complete the credential rotation described above. Keep environment files, dependencies, builds, backups, and resident exports out of Git.
-2. Run the [tests, audits, production build, artifact checks, and repository check](#tests-and-production-build). Tests use synthetic data and mocks.
-3. Publish the release commit manually when ready, after reviewing provider auto-deploy settings.
-4. If the backend changed, deploy it to the existing Render service. Confirm its database connection and both health endpoints. An unauthenticated request to `/api/rooms` should return 401.
-5. Deploy the frontend in the existing Vercel project with the correct production API variable. Use a fresh build without the previous cache when troubleshooting an old API URL. If the frontend hostname changes, update Render's exact `CLIENT_URL` too.
-6. Complete the hosted checks below. Use an isolated database for write or concurrency acceptance tests.
-
-### Hosted acceptance checks
-
-- Sign in with an existing account and visit dashboard, rooms, residents/profile, attendance, rent, electricity, payments, reminders, settings, and reports.
-- Refresh `/rooms`, `/residents/<existing-id>`, `/payments`, `/reports`, and `/settings` directly. The SPA should load; signed-out users should reach login.
-- Confirm requests use the Render HTTPS API with one `/api` prefix and attach `Authorization: Bearer ...`. No production request should target localhost.
-- Download receipts for existing rent and electricity payments, a monthly PDF, and all eight CSV formats. Check saved payment IDs and Asia/Kolkata transaction-date totals.
-- Preview reminder text and inspect the encoded `wa.me` link. Opening WhatsApp or marking activity updates application history; preview alone is enough for a production read-only check.
-- Verify that session expiry clears authentication and transient network failures preserve the saved token. Allow a sleeping Render service to start; the client timeout is 90 seconds.
-- Test owner isolation, mutations, payment retries, and concurrent payments with synthetic accounts in an isolated database. Automated mocks do not replace this acceptance coverage.
-
-### Troubleshooting
-
-| Symptom | Checks |
-| --- | --- |
-| Production requests target localhost or an old API | Check Vercel's Production `VITE_API_BASE_URL`, then rebuild and redeploy. A settings edit cannot change an existing bundle. |
-| Refreshing a page returns a platform 404 | Confirm Vercel Root Directory is `frontend` and `vercel.json` is included in the deployment. |
-| Browser reports CORS errors | Match the frontend origin exactly in Render's `CLIENT_URL`. Check that preflight allows `Authorization` and `Content-Type`. Local development uses `http://localhost:5173`. |
-| API starts slowly after inactivity | Allow the service to resume. Network failures preserve the saved session token. |
-| `/api/ready` returns 503 | Check Render's `MONGO_URI`, database credentials, Atlas access list, and connectivity. Preserve the existing database name. |
-| `/api/ready` returns 404 on an older service | Deploy the backend version providing it before selecting it as the health probe. |
-| Requests return 401 | Check token validity and recent JWT rotation. Cross-host authentication uses bearer tokens and does not require cross-site cookies. |
-| Sign-in requests return 429 | Wait for the auth rate limit to reset and check forwarded client IP handling. |
-
-The auth limiter stores state in memory for one API instance and resets when it restarts. Multiple instances require a shared limiter store.
-
-Confirm account-specific hosting limits and plan eligibility before operating a commercial service. Provider references: [Render Free](https://render.com/docs/free), [Render Node versions](https://render.com/docs/node-version), [health checks](https://render.com/docs/health-checks), [outbound IP ranges](https://render.com/docs/outbound-ip-addresses), [Vite on Vercel](https://vercel.com/docs/frameworks/frontend/vite), [Vercel plans](https://vercel.com/pricing), [Atlas cluster types](https://www.mongodb.com/docs/atlas/manage-clusters/), and [Atlas IP access lists](https://www.mongodb.com/docs/atlas/security/ip-access-list/).
-
-## Author
-
-Parkhi Kumari — B.Tech Computer Science and Engineering, AI & Data Science.
+[GitHub: @amparkhi21](https://github.com/amparkhi21) · [Project repository](https://github.com/amparkhi21/Smart_PG_Manager)

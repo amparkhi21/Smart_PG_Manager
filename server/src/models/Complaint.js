@@ -1,8 +1,5 @@
+import { COMPLAINT_CATEGORIES, COMPLAINT_PRIORITIES, COMPLAINT_STATUSES } from '../constants.js';
 import mongoose from 'mongoose';
-
-export const COMPLAINT_CATEGORIES = ['Maintenance', 'Electricity', 'Water', 'Wi-Fi', 'Cleaning', 'Food', 'Other'];
-export const COMPLAINT_PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'];
-export const COMPLAINT_STATUSES = ['Open', 'In Progress', 'Resolved'];
 
 const complaintSchema = new mongoose.Schema({
   owner: { type: mongoose.Schema.Types.ObjectId, ref: 'Owner', required: true, immutable: true },

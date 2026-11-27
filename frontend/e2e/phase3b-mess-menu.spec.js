@@ -90,8 +90,20 @@ test('owner validates, confirms, creates, edits, schedules and deletes menus on 
   await page.getByRole('dialog', { name: 'Delete this menu?', exact: true }).getByRole('button', { name: 'Delete menu', exact: true }).click();
   await expect(page.getByText('No menu planned yet', { exact: true })).toBeVisible();
   expect(state.menus.has(FUTURE)).toBe(false); expect(state.menus.has(TODAY)).toBe(true);
-  await page.getByRole('button', { name: 'More', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'More', exact: true }).getByRole('link', { name: 'Mess', exact: true })).toHaveAttribute('href', '/mess-management');
+  const primary = page.getByRole('navigation', { name: 'Main navigation', exact: true });
+  const mess = primary.getByRole('link', { name: 'Mess Management', exact: true });
+  await expect(mess).toBeVisible();
+  await expect(mess).toHaveText('Mess');
+  await expect(mess).toHaveAttribute('href', '/mess-management');
+  await primary.getByRole('button', { name: 'More', exact: true }).click();
+  const more = page.getByRole('dialog', { name: 'More', exact: true });
+  await expect(more.getByRole('link', { name: 'Mess Management', exact: true })).toHaveCount(0);
+  await more.getByRole('link', { name: 'Attendance', exact: true }).click();
+  await expect(more).toHaveCount(0);
+  await expect(page).toHaveURL(/\/attendance$/);
+  await mess.click();
+  await expect(page).toHaveURL(/\/mess-management$/);
+  await expect(page.getByRole('heading', { name: 'Mess Management', exact: true })).toBeVisible();
 });
 
 test('failed owner saves retain the draft and do not display an unsaved menu', async ({ page }) => {

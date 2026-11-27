@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import rateLimit from 'express-rate-limit';
-import { protect, protectResident } from '../middleware/auth.js';
-import validate from '../middleware/validate.js';
+import { protect, protectResident } from '../middlewares/auth.js';
+import validate from '../middlewares/validate.js';
 import { isRealDate, todayIST } from '../utils/dates.js';
-import { LEAVE_STATUSES, leaveDurationDays } from '../models/LeaveRequest.js';
+import { LEAVE_STATUSES } from '../constants.js';
+import { leaveDurationDays } from '../models/LeaveRequest.js';
 import { createLeaveRequest, listLeaveRequests, getLeaveRequest, cancelLeaveRequest, decideLeaveRequest } from '../controllers/leaveRequestController.js';
 
 const dateRule = (chain) => chain.isString().bail().custom(isRealDate).withMessage('Use a real Indian calendar date in YYYY-MM-DD format');

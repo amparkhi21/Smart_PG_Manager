@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
-import { protect, protectResident } from '../middleware/auth.js';
-import validate from '../middleware/validate.js';
+import { protect, protectResident } from '../middlewares/auth.js';
+import validate from '../middlewares/validate.js';
 import ApiError from '../utils/ApiError.js';
-import { CONTACT_CATEGORIES, normalizeContactPhone } from '../models/EmergencyContact.js';
+import { CONTACT_CATEGORIES } from '../constants.js';
+import { normalizeContactPhone } from '../models/EmergencyContact.js';
 import { listContacts, createContact, updateContact, deleteContact } from '../controllers/emergencyContactController.js';
 
 const inputRules = () => [

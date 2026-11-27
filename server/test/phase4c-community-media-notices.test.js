@@ -12,7 +12,8 @@ import Resident from '../src/models/Resident.js';
 import CommunityMessage from '../src/models/CommunityMessage.js';
 import Notice from '../src/models/Notice.js';
 import generateToken, { generateResidentToken } from '../src/utils/generateToken.js';
-import { IMAGE_MAX_BYTES, imageType } from '../src/utils/communityImages.js';
+import { IMAGE_MAX_BYTES } from '../src/constants.js';
+import { imageType } from '../src/utils/communityImages.js';
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4v5ThPwAG7wKkCcxydAAAAABJRU5ErkJggg==', 'base64');
 

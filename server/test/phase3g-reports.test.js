@@ -6,7 +6,7 @@ import RentRecord from '../src/models/RentRecord.js';
 import Resident from '../src/models/Resident.js';
 import Room from '../src/models/Room.js';
 import { getMonthlyReportData } from '../src/controllers/reportsController.js';
-import { appendPaymentAtomically } from '../src/utils/billing.js';
+import { appendPaymentAtomically } from '../src/services/billingService.js';
 
 const queryWith = (value) => ({
   select() { return this; },

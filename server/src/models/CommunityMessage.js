@@ -1,8 +1,5 @@
+import { MESSAGE_MAX_LENGTH, COMMUNITY_ISSUE_CATEGORIES, COMMUNITY_ISSUE_STATUSES } from '../constants.js';
 import mongoose from 'mongoose';
-
-export const MESSAGE_MAX_LENGTH = 2000;
-export const COMMUNITY_ISSUE_CATEGORIES = ['General Discussion', 'Water Problem', 'Electricity Problem', 'Wi-Fi Problem', 'Cleaning / Maintenance', 'Food / Mess', 'Other Hostel Issue'];
-export const COMMUNITY_ISSUE_STATUSES = ['Open', 'In Progress', 'Resolved'];
 
 const communityMessageSchema = new mongoose.Schema({
   // The existing owner record identifies the private PG community.

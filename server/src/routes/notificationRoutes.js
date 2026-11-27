@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import rateLimit from 'express-rate-limit';
-import { protect, protectResident, verifySession } from '../middleware/auth.js';
-import validate from '../middleware/validate.js';
+import { protect, protectResident, verifySession } from '../middlewares/auth.js';
+import validate from '../middlewares/validate.js';
 import { listNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead } from '../controllers/notificationController.js';
 import { registerPushDevice, unregisterPushDevice } from '../controllers/pushDeviceController.js';
 

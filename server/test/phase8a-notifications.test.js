@@ -22,10 +22,10 @@ import ElectricityBill from '../src/models/ElectricityBill.js';
 import Attendance from '../src/models/Attendance.js';
 import CommunityMessage from '../src/models/CommunityMessage.js';
 import { notificationEvent } from '../src/models/notificationOutbox.js';
-import { deliverPendingNotifications, prepareDueReminder } from '../src/utils/notifications.js';
+import { deliverPendingNotifications, prepareDueReminder } from '../src/services/notificationDeliveryService.js';
 import generateToken, { generateResidentToken } from '../src/utils/generateToken.js';
 import { todayIST } from '../src/utils/dates.js';
-import { appendPaymentAtomically } from '../src/utils/billing.js';
+import { appendPaymentAtomically } from '../src/services/billingService.js';
 
 test('notification events select fixed roles and internal paths; no arbitrary navigation targets', () => {
   const id = new mongoose.Types.ObjectId();

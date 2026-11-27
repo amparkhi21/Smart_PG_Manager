@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { protect } from '../middleware/auth.js';
-import validate from '../middleware/validate.js';
+import { protect } from '../middlewares/auth.js';
+import validate from '../middlewares/validate.js';
 import { getSettings, updateSettings } from '../controllers/settingsController.js';
 import { validUpiId } from '../utils/upi.js';
 

@@ -27,7 +27,7 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import remindersRoutes from './routes/remindersRoutes.js';
 import reportsRoutes from './routes/reportsRoutes.js';
-import { notFound, errorHandler } from './middleware/errorHandler.js';
+import { notFound, errorHandler } from './middlewares/errorHandler.js';
 
 export function createApp(env = process.env) {
   const app = express();

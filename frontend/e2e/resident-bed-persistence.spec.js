@@ -31,7 +31,7 @@ test.beforeAll(async () => {
   test.setTimeout(120000);
   originalSecret = process.env.JWT_SECRET;
   process.env.JWT_SECRET = 'isolated-real-browser-bed-secret-'.repeat(3);
-  // Never load .env, server.js, seed.js, or a supplied database URI.
+  // Never load .env, index.js, seed.js, or a supplied database URI.
   database = await MongoMemoryReplSet.create({
     binary: { version: '8.0.17', downloadDir: fileURLToPath(new URL('../../tmp/mongodb-binaries/', import.meta.url)) },
     replSet: { count: 1 },

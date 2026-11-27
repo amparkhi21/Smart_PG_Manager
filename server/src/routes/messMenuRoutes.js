@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
-import { protect } from '../middleware/auth.js';
-import validate from '../middleware/validate.js';
+import { protect } from '../middlewares/auth.js';
+import validate from '../middlewares/validate.js';
 import { isRealDate } from '../utils/dates.js';
-import { MEAL_KEYS, SERVING_TIME_RE } from '../models/MessMenu.js';
+import { MEAL_KEYS, SERVING_TIME_RE } from '../constants.js';
 import { createMessMenu, listMessMenus, getMessMenu, updateMessMenu, deleteMessMenu } from '../controllers/messMenuController.js';
 import rateLimit from 'express-rate-limit';
 import { generateMessPlan } from '../controllers/aiMessMenuController.js';

@@ -10,7 +10,9 @@ import { validPushNotification } from '../utils/pushNotifications.js';
 
 const PushNotificationsContext = createContext(null);
 let pluginPromise;
-const loadPushPlugin = () => pluginPromise ||= import('@capacitor/push-notifications').then(({ PushNotifications }) => PushNotifications);
+// Keep the module wrapper: a Capacitor plugin proxy exposes a `then` method,
+// so returning the proxy from a promise would stall promise resolution.
+const loadPushPlugin = () => pluginPromise ||= import('@capacitor/push-notifications');
 const refreshNotifications = () => window.dispatchEvent(new Event('notifications:refresh'));
 
 export function PushNotificationsProvider({ children }) {
@@ -82,7 +84,7 @@ export function PushNotificationsProvider({ children }) {
       try {
         const config = await Native.getPushConfiguration();
         if (!disposed) setFirebaseConfigured(Boolean(config.firebaseConfigured));
-        const plugin = await loadPushPlugin();
+        const { PushNotifications: plugin } = await loadPushPlugin();
         if (disposed) return;
         pluginRef.current = plugin;
         const handles = await Promise.all([

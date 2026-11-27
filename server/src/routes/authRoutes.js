@@ -2,10 +2,10 @@ import { Router } from 'express';
 import { body, query } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import { register, login, getMe } from '../controllers/authController.js';
-import { protect, protectResident, protectSession } from '../middleware/auth.js';
+import { protect, protectResident, protectSession } from '../middlewares/auth.js';
 import { residentHostels, residentLogin, residentMe, changeResidentPassword } from '../controllers/residentAuthController.js';
 import { validPassword } from '../utils/residentAuth.js';
-import validate from '../middleware/validate.js';
+import validate from '../middlewares/validate.js';
 
 const router = Router();
 

@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { NOTIFICATION_TARGETS } from './Notification.js';
+import { NOTIFICATION_TARGETS } from '../constants.js';
 
 const eventSchema = new mongoose.Schema({
   eventKey: { type: String, required: true, maxlength: 160 },

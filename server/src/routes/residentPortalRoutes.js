@@ -1,14 +1,14 @@
 import { Router } from 'express';
-import { protectResident } from '../middleware/auth.js';
+import { protectResident } from '../middlewares/auth.js';
 import { getResidentDashboard, getResidentOwnProfile, getResidentAttendance } from '../controllers/residentPortalController.js';
 import { body, query } from 'express-validator';
-import validate from '../middleware/validate.js';
+import validate from '../middlewares/validate.js';
 import { getMyRoom, getRoomAvailability } from '../controllers/residentRoomController.js';
 import { createRoomChange, listRoomChanges, cancelRoomChangeRequest } from '../controllers/roomChangeController.js';
 import { getTodaysMessMenu, getUpcomingMessMenus } from '../controllers/messMenuController.js';
 import rateLimit from 'express-rate-limit';
-import { dateIn, idParam, monthIn } from '../middleware/validators.js';
-import { CLAIM_STATUSES, BILL_TYPES } from '../models/PaymentClaim.js';
+import { dateIn, idParam, monthIn } from '../middlewares/validators.js';
+import { CLAIM_STATUSES, BILL_TYPES } from '../constants.js';
 import { listMyBills, listMyClaims, submitClaim, cancelMyClaim, getMyPaymentDetails, listMyPaymentHistory } from '../controllers/paymentClaimController.js';
 
 const router = Router();

@@ -17,16 +17,20 @@ async function setup(page, token) {
   });
 }
 
-test('owner legacy complaints URL redirects to Requests', async ({ page }) => {
+test('owner legacy complaint, leave, payment and room-change URLs redirect to Requests', async ({ page }) => {
   await setup(page, 'owner-token');
-  await page.goto('/complaints');
-  await expect(page).toHaveURL(/\/requests$/);
-  await expect(page.getByRole('heading', { name: 'Requests', exact: true })).toBeVisible();
+  for (const path of ['/complaints', '/leave-requests', '/payment-requests', '/room-change-requests']) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/requests$/);
+    await expect(page.getByRole('heading', { name: 'Requests', exact: true })).toBeVisible();
+  }
 });
 
-test('resident legacy complaints URL redirects to My Requests', async ({ page }) => {
+test('resident legacy complaint, leave and room-change URLs redirect to My Requests', async ({ page }) => {
   await setup(page, 'resident-token');
-  await page.goto('/resident/complaints');
-  await expect(page).toHaveURL(/\/resident\/requests$/);
-  await expect(page.getByRole('heading', { name: 'My Requests', exact: true })).toBeVisible();
+  for (const path of ['/resident/complaints', '/resident/leave-requests', '/resident/room-change-requests']) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/resident\/requests$/);
+    await expect(page.getByRole('heading', { name: 'My Requests', exact: true })).toBeVisible();
+  }
 });
